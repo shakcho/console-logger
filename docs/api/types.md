@@ -133,7 +133,7 @@ interface KonsoleOptions {
 | `defaultBatchSize` | `number` | `100` | Entries per `viewLogs()` call |
 | `retentionPeriod` | `number` | `172800000` | 48 hours in ms |
 | `cleanupInterval` | `number` | `3600000` | 1 hour in ms |
-| `useWorker` | `boolean` | `false` | Web Worker mode (browser only) |
+| `useWorker` | `boolean` | `false` | Worker mode (Web Worker in browser, `worker_threads` in Node.js) |
 | `criteria` | `Criteria` | `true` | Output filter *(deprecated — use `level` and `format`)* |
 
 ---

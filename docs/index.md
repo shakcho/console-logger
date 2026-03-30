@@ -19,7 +19,7 @@ hero:
 features:
   - icon: 🌐
     title: Browser-First, Node.js Ready
-    details: Works everywhere — styled badges in DevTools, pretty ANSI in the terminal, NDJSON in CI. Web Worker transport keeps the browser UI thread free. No other structured logger offers this.
+    details: Works everywhere — styled badges in DevTools, pretty ANSI in the terminal, NDJSON in CI. Worker transport (Web Worker in browsers, worker_threads in Node.js) keeps the main thread free. No other structured logger offers this.
   - icon: 🏷️
     title: Namespaced + Child Loggers
     details: Organize logs by feature with namespaces. Create child loggers that inherit config and automatically attach request IDs, user context, and more.
@@ -37,7 +37,7 @@ features:
     details: Ship logs to any destination — HTTP endpoints, log files, writable streams, or the console. Batching, retry, and filtering built in.
   - icon: 💾
     title: Memory-Efficient Storage
-    details: Circular buffer stores logs for browser DevTools inspection. In Node.js, buffer is off by default for maximum throughput. Web Worker offloads transport processing from the main thread.
+    details: Circular buffer stores logs for browser DevTools inspection. In Node.js, buffer is off by default for maximum throughput. Worker offloads transport processing from the main thread on both platforms.
   - icon: 📦
     title: TypeScript First
     details: Built with TypeScript from the ground up. Full type safety, zero runtime dependencies.

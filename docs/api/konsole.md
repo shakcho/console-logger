@@ -386,7 +386,7 @@ const errors = logger.getLogs().filter((e) => e.level === 'error');
 getLogsAsync(): Promise<ReadonlyArray<LogEntry>>
 ```
 
-Returns all stored entries asynchronously. When `useWorker: true`, retrieves from the worker; otherwise equivalent to `getLogs()`.
+Returns all stored entries asynchronously. When `useWorker: true`, retrieves from the background worker (Web Worker in browsers, `worker_threads` in Node.js); otherwise equivalent to `getLogs()`.
 
 ---
 

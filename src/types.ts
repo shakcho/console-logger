@@ -194,7 +194,7 @@ export interface KonsoleOptions {
    * Set explicitly to override the environment default.
    */
   buffer?: boolean;
-  /** Offload log storage to a Web Worker — browser only (default: false) */
+  /** Offload log storage to a worker thread — Web Worker (browser) or worker_threads (Node.js) (default: false) */
   useWorker?: boolean;
   /**
    * Transports to forward log entries to external destinations.
