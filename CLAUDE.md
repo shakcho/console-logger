@@ -63,7 +63,7 @@ Guidelines:
 ## Environment requirements
 
 - **Node.js ≥ 18** is required for server-side use (native `fetch`). Older versions must pass a `fetchImpl` option to `TransportConfig`.
-- `useWorker: true` is browser-only. In Node.js it is silently ignored with a console warning.
+- `useWorker: true` is supported on both browser (Web Worker) and Node.js (`worker_threads`). Falls back gracefully if neither is available.
 - The global print flag (`__KonsolePrintEnabled__`) is stored on `globalThis` — works in both environments.
 
 ## Architecture
@@ -123,6 +123,7 @@ Call-site fields are merged with child bindings at log time; call-site fields wi
 | `src/formatter.ts` | Five formatters + `createFormatter()` / `createAutoFormatter()` factories + `resolveTimestampConfig()` / `formatTimestamp()` |
 | `src/env.ts` | `isBrowser`, `isNode`, `isTTY()`, `getGlobalFetch()`, `getHrTime()` — computed at module load |
 | `src/types.ts` | All shared types: `LogEntry`, `Transport`, `KonsoleOptions`, `TransportConfig`, `TimestampFormat`, `TimestampOptions`, etc. |
+| `src/workerAdapter.ts` | Platform-agnostic worker factory (`KonsoleWorker` interface); Web Worker (browser) or `worker_threads` (Node.js) |
 | `src/transports/base.ts` | `toJsonLine()` / `toTextLine()` / `toLine()` shared by file+stream transports |
 
 ### Transport system
@@ -159,6 +160,8 @@ All structured output follows the Pino-compatible schema:
 ### Worker mode dual-storage
 
 When `useWorker: true`, logs are written to **both** the main-thread `CircularBuffer` (for synchronous `getLogs()`) and posted to the shared worker (for transport processing). The worker contains a self-contained `CircularBuffer` copy as an inline string inside `getWorkerCode()`. `getLogsAsync()` fetches from the worker; `getLogs()` reads the main-thread buffer.
+
+Worker creation is handled by `createPlatformWorker()` in `src/workerAdapter.ts`, which returns a unified `KonsoleWorker` interface. In browsers it uses `Blob` + `URL.createObjectURL` to create a Web Worker; in Node.js it dynamically imports `worker_threads` and prepends a shim that maps `parentPort` onto the `self.onmessage`/`self.postMessage` convention. Messages sent before the async Node.js import resolves are buffered and flushed once the worker is ready.
 
 ### Console output control
 

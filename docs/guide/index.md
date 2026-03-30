@@ -9,7 +9,7 @@ Console is a structured, namespaced logging library for JavaScript and TypeScrip
 - **Field redaction** — mask sensitive data before it reaches any destination
 - **Multiple transports** — HTTP, file, stream, or console
 - **Memory-efficient storage** with circular buffers
-- **Web Worker support** for background processing in browsers
+- **Worker support** for background processing (Web Worker in browsers, `worker_threads` in Node.js)
 - **Node.js and browser** — works in both without any configuration
 
 ## Why Console?
@@ -40,7 +40,7 @@ Console solves all of these while remaining lightweight and dependency-free.
 | Log storage / history | ❌ | ✅ |
 | Multiple transports | ❌ | ✅ |
 | File transport | ❌ | ✅ |
-| Web Worker transport | ❌ | ✅ (non-blocking browser logging) |
+| Worker transport | ❌ | ✅ (non-blocking logging in browser and Node.js) |
 | Type safety | ❌ | ✅ |
 | Zero dependencies | ✅ | ✅ |
 | Browser + Node.js | ✅ (basic) | ✅ (structured, with DevTools tooling) |

@@ -11,7 +11,7 @@
 
 ---
 
-- **Browser-first, Node.js ready** — works everywhere; Web Worker transport keeps the UI thread free
+- **Browser-first, Node.js ready** — works everywhere; worker transport (Web Worker in browsers, `worker_threads` in Node.js) keeps the main thread free
 - **Six numeric log levels** — trace / debug / info / warn / error / fatal
 - **Structured output** — consistent JSON schema, compatible with Datadog, Loki, CloudWatch
 - **Beautiful terminal output** — ANSI colors on TTY, NDJSON in pipes, styled badges in DevTools
@@ -329,7 +329,7 @@ new Konsole({
   defaultBatchSize?: number;   // default: 100 (viewLogs batch)
   retentionPeriod?: number;    // default: 172800000 (48 hours)
   cleanupInterval?: number;    // default: 3600000 (1 hour)
-  useWorker?: boolean;         // default: false (browser only)
+  useWorker?: boolean;         // default: false
 })
 ```
 
@@ -344,7 +344,7 @@ new Konsole({
 | `setLevel(level)` | Change minimum level at runtime |
 | `setTimestamp(format)` | Change timestamp format at runtime |
 | `getLogs()` | Return all entries from the circular buffer |
-| `getLogsAsync()` | Async variant (for Web Worker mode) |
+| `getLogsAsync()` | Async variant (for worker mode) |
 | `clearLogs()` | Empty the buffer |
 | `viewLogs(batchSize?)` | Print a batch of stored logs to the console |
 | `getStats()` | `{ logCount, capacity }` |
@@ -380,7 +380,7 @@ __Konsole.getLogger('Auth').setTimestamp('time') // per-logger override
 
 ## Performance
 
-Console is designed to have minimal overhead. Unlike Pino, Winston, and Bunyan (Node.js only), Console works natively in the browser with Web Worker offloading for non-blocking transport processing.
+Console is designed to have minimal overhead. Unlike Pino, Winston, and Bunyan (Node.js only), Console works natively in the browser and Node.js with worker offloading for non-blocking transport processing.
 
 Benchmarked on Apple M2 Max, Node.js v23 (100K iterations):
 
@@ -395,13 +395,13 @@ Benchmarked on Apple M2 Max, Node.js v23 (100K iterations):
 | **Bundle (gzip)** | **~10 KB** | ~32 KB | ~70 KB | ~45 KB |
 | **Install size** | **86 KB** | 1.17 MB | 360 KB | 212 KB |
 | **Dependencies** | **0** | 11 | 11 | 0 |
-| **Browser support** | **Native + Web Worker** | No | No | No |
+| **Browser support** | **Native + Worker** | No | No | No |
 
 > Run `npm run benchmark` to reproduce on your hardware. Install competitors with `npm install --no-save pino winston bunyan`.
 
-### Browser Performance
+### Worker Performance
 
-With `useWorker: true`, log storage and HTTP transport batching run on a Web Worker — the main thread never blocks on logging:
+With `useWorker: true`, log storage and HTTP transport batching run on a background worker (Web Worker in browsers, `worker_threads` in Node.js) — the main thread never blocks on logging:
 
 ```typescript
 const logger = new Konsole({
@@ -415,7 +415,7 @@ const logger = new Konsole({
   }],
 });
 
-// Logging never blocks rendering — processed in background
+// Logging never blocks rendering / event loop — processed in background
 logger.info('User action', { event: 'click', target: 'checkout' });
 ```
 
@@ -424,7 +424,6 @@ No other structured logging library offers this.
 ## Requirements
 
 - **Node.js ≥ 18** for server-side use (native `fetch`). Older versions must pass `fetchImpl` to `TransportConfig`.
-- `useWorker: true` is browser-only — silently ignored in Node.js.
 
 ## License
 

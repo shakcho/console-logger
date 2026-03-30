@@ -3,6 +3,7 @@ import { HttpTransport } from './transports/HttpTransport';
 import { LEVELS, type LogLevelName } from './levels';
 import { createFormatter, resolveTimestampConfig, type Formatter, type KonsoleFormat } from './formatter';
 import { getHrTime, isBrowser } from './env';
+import { createPlatformWorker, type KonsoleWorker } from './workerAdapter';
 import { compileRedactPaths, applyRedaction } from './redact';
 import type {
   LogEntry,
@@ -68,7 +69,7 @@ const LV_FATAL = 60;
 export class Konsole implements KonsolePublic {
   private static instances: Map<string, Konsole> = new Map();
   private static globalFlagName = '__KonsolePrintEnabled__';
-  private static sharedWorker: Worker | null = null;
+  private static sharedWorker: KonsoleWorker | null = null;
   private static workerPendingCallbacks: Map<string, (logs: LogEntry[]) => void> = new Map();
   /** Browser-only runtime flag. When true, redaction is bypassed for all loggers. */
   private static _redactionDisabled: boolean = false;
@@ -139,14 +140,7 @@ export class Konsole implements KonsolePublic {
     this.defaultBatchSize = defaultBatchSize;
     this.retentionPeriod = retentionPeriod;
     this.maxLogs         = maxLogs;
-    this.useWorker       = useWorker && typeof Worker !== 'undefined';
-
-    if (useWorker && !this.useWorker) {
-      console.warn(
-        '[Konsole] Web Worker is not available in this environment (useWorker ignored). ' +
-        'In Node.js, offloaded worker processing is not yet supported.',
-      );
-    }
+    this.useWorker = useWorker;
 
     // Buffer defaults: on in browser (for getLogs/viewLogs/exposeToWindow), off in Node.js
     this._bufferEnabled = buffer ?? isBrowser;
@@ -668,7 +662,7 @@ export class Konsole implements KonsolePublic {
       this.logs.push(entry);
     }
 
-    // Forward to Web Worker when enabled
+    // Forward to worker when enabled
     if (this.useWorker && Konsole.sharedWorker) {
       const serializable: SerializableLogEntry = {
         msg,
@@ -759,31 +753,31 @@ export class Konsole implements KonsolePublic {
 
   private initWorker(transports: TransportConfig[]): void {
     if (!Konsole.sharedWorker) {
-      try {
-        const blob      = new Blob([this.getWorkerCode()], { type: 'application/javascript' });
-        const workerUrl = URL.createObjectURL(blob);
-        Konsole.sharedWorker = new Worker(workerUrl);
+      const worker = createPlatformWorker(this.getWorkerCode());
 
-        Konsole.sharedWorker.onmessage = (event: MessageEvent<WorkerMessage>) => {
-          const { type, payload, requestId } = event.data;
-          if (type === 'LOGS_RESPONSE' && requestId) {
-            const callback = Konsole.workerPendingCallbacks.get(requestId);
-            if (callback) {
-              const logs = (payload as SerializableLogEntry[]).map((e) => ({
-                ...e,
-                timestamp: new Date(e.timestamp),
-                hrTime: e.hrTime,
-              }));
-              callback(logs);
-              Konsole.workerPendingCallbacks.delete(requestId);
-            }
-          }
-        };
-      } catch {
+      if (!worker) {
         console.warn('[Konsole] Failed to initialize worker, falling back to main thread.');
         this.useWorker = false;
         return;
       }
+
+      Konsole.sharedWorker = worker;
+
+      Konsole.sharedWorker.onmessage = (event: { data: unknown }) => {
+        const { type, payload, requestId } = event.data as WorkerMessage;
+        if (type === 'LOGS_RESPONSE' && requestId) {
+          const callback = Konsole.workerPendingCallbacks.get(requestId);
+          if (callback) {
+            const logs = (payload as SerializableLogEntry[]).map((e) => ({
+              ...e,
+              timestamp: new Date(e.timestamp),
+              hrTime: e.hrTime,
+            }));
+            callback(logs);
+            Konsole.workerPendingCallbacks.delete(requestId);
+          }
+        }
+      };
     }
 
     Konsole.sharedWorker?.postMessage({

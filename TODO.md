@@ -9,11 +9,11 @@ Goal: universal logging library (Browser + Node.js) competitive with Pino.js, wi
 - [x] **Node.js compatibility**
   - [x] Replace `window` usage with `globalThis`
   - [x] Guard `fetch` with environment detection; require Node 18+ or accept `fetchImpl` option
-  - [x] Add clear warning when `useWorker: true` is set in Node.js (graceful fallback)
+  - [x] Add clear warning when `useWorker: true` is set in Node.js (graceful fallback) — replaced by platform adapter in v4.3.0
   - [x] Add `@types/node` to devDependencies
   - [x] Add `engines: { node: ">=18.0.0" }` to `package.json`
-  - [ ] Replace browser `Worker` + Blob approach with platform adapter (browser Web Worker / Node.js `worker_threads`) — deferred to P3
-  - [ ] Add conditional `node` / `browser` exports in `package.json` — deferred until transports diverge
+  - [x] Replace browser `Worker` + Blob approach with platform adapter (browser Web Worker / Node.js `worker_threads`)
+  - [x] Add conditional `node` / `browser` exports in `package.json`
 
 - [x] **JSON structured output + numeric log levels**
   - [x] Add `trace()`, `debug()`, `fatal()` methods
@@ -191,4 +191,12 @@ Goal: universal logging library (Browser + Node.js) competitive with Pino.js, wi
 
 ## Done
 
-_(moved here as items are completed)_
+- [x] **Platform worker adapter** (v4.3.0)
+  - [x] `createPlatformWorker()` factory in `src/workerAdapter.ts` with unified `KonsoleWorker` interface
+  - [x] Browser: Web Worker via Blob + Object URL
+  - [x] Node.js: `worker_threads` via dynamic import with `parentPort` shim
+  - [x] Message buffering for async Node.js worker initialization
+  - [x] Graceful fallback to main thread if no worker API available
+  - [x] Conditional `node` / `browser` exports in `package.json`
+  - [x] Tests: creation, echo, buffering, terminate, full Konsole worker code
+  - [x] Updated all docs, site, README, CLAUDE.md, and changelog

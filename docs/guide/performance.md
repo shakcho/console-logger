@@ -14,9 +14,9 @@ Measured on Apple M2 Max, Node.js v23.11.0, 100K iterations per benchmark.
 | JSON → /dev/null | ~650K | ~470K | ~270K | ~340K |
 | Child (disabled) | ~17M | ~14M | ~2M | — |
 | Silent (browser, with buffer) | ~4.7M | — | — | — |
-| Browser + Worker | non-blocking | — | — | — |
+| With Worker (browser/Node.js) | non-blocking | — | — | — |
 
-> Pino, Winston, and Bunyan are Node.js only. Console is the only structured logger that runs natively in the browser with Web Worker offloading.
+> Pino, Winston, and Bunyan are Node.js only. Console is the only structured logger that runs natively in the browser and Node.js with worker offloading.
 
 ### Latency (p50)
 
@@ -76,11 +76,11 @@ const stats = logger.getStats();
 console.log(stats.memoryUsage); // "1234/5000 (24.7%)"
 ```
 
-## Web Worker Transport
+## Worker Transport
 
-This is Console's standout feature for browser applications. With `useWorker: true`, log storage and HTTP transport batching move to a background Web Worker. The main thread never blocks on logging — even at high volume.
+This is Console's standout feature. With `useWorker: true`, log storage and HTTP transport batching move to a background worker — Web Worker in browsers, `worker_threads` in Node.js. The main thread never blocks on logging, even at high volume.
 
-No other structured logging library (Pino, Winston, Bunyan) works in the browser, let alone offers Worker offloading.
+No other structured logging library (Pino, Winston, Bunyan) works in the browser, let alone offers cross-platform worker offloading.
 
 ```typescript
 const logger = new Konsole({
@@ -112,11 +112,12 @@ const logs = await logger.getLogsAsync();
 ### How it works
 
 When `useWorker: true`:
-- Logs are written to **both** the main-thread buffer (for synchronous `getLogs()`) and a Web Worker
-- HTTP transports run entirely in the Worker — batching, flushing, and retries happen off the main thread
+- Logs are written to **both** the main-thread buffer (for synchronous `getLogs()`) and a background worker
+- HTTP transports run entirely in the worker — batching, flushing, and retries happen off the main thread
 - Use `getLogsAsync()` to retrieve the worker's copy of stored logs
-
-Silently ignored in Node.js with a console warning.
+- In browsers, uses Web Worker via Blob + Object URL
+- In Node.js, uses `worker_threads` via dynamic import with a compatibility shim
+- Falls back gracefully to main-thread processing if no worker API is available
 
 ## Production Tips
 

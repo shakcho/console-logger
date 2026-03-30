@@ -94,7 +94,7 @@ Redaction is applied in the `addLog()` pipeline **before** any consumer:
 1. Entry is built (fields merged with bindings)
 2. **Redaction applied here**
 3. Entry stored in circular buffer
-4. Entry forwarded to Web Worker (if enabled)
+4. Entry forwarded to worker (if enabled)
 5. Entry forwarded to transports
 6. Entry written to formatter (console output)
 
@@ -102,7 +102,7 @@ This means redacted values never appear in:
 - `getLogs()` / `getLogsAsync()` results
 - Transport payloads (HTTP, file, stream)
 - Console output (pretty, JSON, browser)
-- Web Worker messages
+- Worker messages
 
 ::: info msg is not redacted
 Only `entry.fields` is inspected. The `entry.msg` string is never modified by redaction. If you log `logger.info('password is hunter2')`, the message text is not masked. Use structured fields for sensitive data.

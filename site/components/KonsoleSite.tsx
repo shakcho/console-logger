@@ -258,8 +258,8 @@ const logger = new Konsole({
 });`,
   },
   {
-    title: 'Web Worker',
-    description: 'Offload log storage and HTTP transport to a background thread — keep the main thread free for rendering.',
+    title: 'Worker Transport',
+    description: 'Offload log storage and HTTP transport to a background worker (Web Worker in browsers, worker_threads in Node.js) — keep the main thread free.',
     code: `const logger = new Konsole({
   namespace: 'App',
   useWorker: true,         // logs processed off main thread
@@ -489,11 +489,11 @@ export default function KonsoleSite() {
 
         {/* Header */}
         <header style={s.header}>
-          <div style={s.headerBadge}>Browser-first · Node.js ready · Web Worker transport</div>
+          <div style={s.headerBadge}>Browser-first · Node.js ready · Worker transport</div>
           <h1 style={s.title}>Console</h1>
           <p style={s.subtitle}>
-            Structured, namespaced logging built for the browser and Node.js. Web Worker transport
-            keeps your UI thread free. Child loggers, configurable timestamps, and flexible transports
+            Structured, namespaced logging built for the browser and Node.js. Worker transport
+            keeps your main thread free. Child loggers, configurable timestamps, and flexible transports
             — all in ~10 KB with zero dependencies.
           </p>
         </header>
@@ -654,7 +654,7 @@ export default function KonsoleSite() {
               { icon: '🎨', title: 'Auto formatting', body: "TTY terminal → ANSI pretty. Pipe / CI → NDJSON. Browser → styled %c badges. One format: 'auto' option handles it all." },
               { icon: '🔒', title: 'Field redaction', body: "Mask sensitive data with redact: ['password', 'req.headers.authorization']. Applied before output, transports, and buffer. Children inherit parent paths. Disable at runtime in browser DevTools for debugging." },
               { icon: '🚚', title: 'Transports', body: 'HttpTransport, FileTransport, StreamTransport, ConsoleTransport. Add multiple to one logger. Filter and transform per transport.' },
-              { icon: '🧵', title: 'Web Worker transport', body: 'useWorker: true moves log storage and HTTP batching off the main thread. Your UI never blocks on logging — even at high volume. Browser-exclusive feature no other logger offers.' },
+              { icon: '🧵', title: 'Worker transport', body: 'useWorker: true moves log storage and HTTP batching off the main thread — Web Worker in browsers, worker_threads in Node.js. Your app never blocks on logging, even at high volume.' },
               { icon: '💾', title: 'In-browser log history', body: 'Circular buffer stores logs in memory for DevTools inspection via getLogs() and exposeToWindow(). In Node.js, buffer is off by default for maximum throughput.' },
               { icon: '⚡', title: 'Fast & lightweight', body: '~10 KB gzipped, zero dependencies. On par with Pino on overhead, faster on JSON serialization, and significantly faster than Winston and Bunyan — at 1/3 the bundle size.' },
             ].map(({ icon, title, body }) => (
@@ -695,7 +695,7 @@ export default function KonsoleSite() {
                   ['JSON → /dev/null', '~650K', '~470K', '~270K', '~340K'],
                   ['Child (disabled)',  '~17M', '~14M', '~2M',   '—'],
                   ['Browser + buffer',  '~4.7M', '—',   '—',     '—'],
-                  ['Browser + Worker',  'non-blocking', '—',   '—',     '—'],
+                  ['With Worker',       'non-blocking', '—',   '—',     '—'],
                 ].map(([scenario, ...vals], i) => (
                   <tr key={i} style={i % 2 === 0 ? s.trEven : {}}>
                     <td style={{ ...s.td, textAlign: 'left' }}>{scenario}</td>
@@ -743,7 +743,7 @@ export default function KonsoleSite() {
           <p style={{ ...s.prose, marginTop: 16, fontSize: 12, color: '#a3a3a3' }}>
             Pino, Winston, and Bunyan are Node.js only.
             Console is the only structured logger that works in both browser and Node.js
-            with Web Worker offloading for non-blocking transport processing.
+            with worker offloading for non-blocking transport processing.
             See the <a style={{ color: '#6366f1' }} href={LINKS.docs + '/guide/performance'}>Performance Guide</a> for details.
           </p>
         </section>

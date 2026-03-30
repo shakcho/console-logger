@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.0] - 2026-03-30
+
+### Added
+
+- **Platform worker adapter** — `useWorker: true` now works on both browser and Node.js
+  - Browser: Web Worker via Blob + Object URL (unchanged)
+  - Node.js: `worker_threads` via dynamic import with `parentPort` shim
+  - Unified `KonsoleWorker` interface in `src/workerAdapter.ts`
+  - Messages sent before the Node.js worker is ready are buffered and flushed automatically
+  - Falls back gracefully to main-thread processing if no worker API is available
+  - New exports: `createPlatformWorker()`, `KonsoleWorker` type
+
+- **Conditional `node` / `browser` exports** in `package.json` for better bundler support
+
+### Changed
+
+- `useWorker: true` is no longer browser-only — it is now supported in Node.js via `worker_threads`
+- Removed the "Web Worker is not available" console warning in Node.js (worker is now created instead)
+
+---
+
 ## [4.2.0] - 2026-03-28
 
 ### Added
@@ -110,7 +131,7 @@ entry.level    // ✅ 'info', 'error', etc.
 - **Node.js compatibility** — Works in both browser and Node.js ≥ 18
   - Replaced `window` usage with `globalThis` throughout
   - `fetch` is detected via `globalThis.fetch`; pass `fetchImpl` for Node.js < 18
-  - Graceful warning when `useWorker: true` is set in Node.js
+  - Graceful warning when `useWorker: true` is set in Node.js (removed in v4.3.0 — now supported natively)
 
 - **Numeric log levels** — Six-level numeric system
   - New methods: `trace()` (10), `debug()` (20), `fatal()` (60)

@@ -250,10 +250,10 @@ How often the retention cleanup runs.
 - **Type:** `boolean`
 - **Default:** `false`
 
-Offload log storage and HTTP transport processing to a Web Worker for better main-thread performance.
+Offload log storage and HTTP transport processing to a background worker for better main-thread performance. Uses a Web Worker in browsers and `worker_threads` in Node.js.
 
-::: warning Browser Only
-`useWorker: true` is silently ignored in Node.js with a console warning. Custom transport instances (`FileTransport`, etc.) are also excluded from worker processing — only `TransportConfig` plain objects are supported in worker mode.
+::: info Platform Adapter
+Worker creation is handled by the platform adapter (`createPlatformWorker`). Falls back gracefully if no worker API is available. Custom transport instances (`FileTransport`, etc.) are excluded from worker processing — only `TransportConfig` plain objects are supported in worker mode.
 :::
 
 ---

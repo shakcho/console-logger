@@ -44,5 +44,9 @@ export type { Formatter, FormatterOptions, KonsoleFormat } from './formatter';
 // ─── Environment ──────────────────────────────────────────────────────────────
 export { isBrowser, isNode, isTTY, getGlobalFetch, getHrTime } from './env';
 
+// ─── Worker adapter ──────────────────────────────────────────────────────────
+export { createPlatformWorker } from './workerAdapter';
+export type { KonsoleWorker }   from './workerAdapter';
+
 // ─── Redaction ────────────────────────────────────────────────────────────────
 export { compileRedactPaths, applyRedaction, REDACTED } from './redact';
