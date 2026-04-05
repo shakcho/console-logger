@@ -1,24 +1,46 @@
-# Console
+# Konsole
 
 <div align="center">
 
-**Structured, namespaced logging for browser and Node.js**
+**The only structured logger that runs natively in browsers and Node.js — with zero dependencies.**
 
 [![npm version](https://img.shields.io/npm/v/konsole-logger.svg)](https://www.npmjs.com/package/konsole-logger)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Bundle Size](https://img.shields.io/bundlephobia/minzip/konsole-logger)](https://bundlephobia.com/package/konsole-logger)
+[![TypeScript](https://img.shields.io/badge/TypeScript-first-blue.svg)](https://www.typescriptlang.org/)
+[![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](https://www.npmjs.com/package/konsole-logger)
+
+[Docs](https://console-logger.saktichourasia.dev/docs/) | [Live Demo](https://console-logger.saktichourasia.dev) | [Changelog](https://console-logger.saktichourasia.dev/docs/changelog)
 
 </div>
 
 ---
 
-- **Browser-first, Node.js ready** — works everywhere; worker transport (Web Worker in browsers, `worker_threads` in Node.js) keeps the main thread free
+## Why Konsole?
+
+| Feature | Konsole | Pino | Winston | Bunyan |
+|---------|:-------:|:----:|:-------:|:------:|
+| Browser support | **Native** | No | No | No |
+| Worker offloading | **Yes** | No | No | No |
+| Bundle (gzip) | **~10 KB** | ~32 KB | ~70 KB | ~45 KB |
+| Dependencies | **0** | 11 | 11 | 0 |
+| Child loggers | Yes | Yes | Yes | Yes |
+| File rotation + gzip | **Built-in** | Separate | Separate | No |
+| Field redaction | **Built-in** | Plugin | No | No |
+| Configurable timestamps | **7 presets + custom** | Epoch only | Basic | Basic |
+| DevTools styling | **CSS badges** | No | No | No |
+| TypeScript-first | **Yes** | Partial | Partial | No |
+
+## Features
+
+- **Browser-first, Node.js ready** — worker transport (Web Worker / `worker_threads`) keeps the main thread free
 - **Six numeric log levels** — trace / debug / info / warn / error / fatal
-- **Structured output** — consistent JSON schema, compatible with Datadog, Loki, CloudWatch
+- **Structured output** ��� consistent JSON schema, compatible with Datadog, Loki, CloudWatch
 - **Beautiful terminal output** — ANSI colors on TTY, NDJSON in pipes, styled badges in DevTools
 - **Configurable timestamps** — full date+time by default, ISO 8601, epoch, nanosecond precision, or custom format
 - **Child loggers** — attach request-scoped context that flows into every log line
-- **Field redaction** — mask sensitive data (`password`, `req.headers.authorization`) before any output or transport
-- **Flexible transports** — HTTP, file (with rotation + gzip), stream, or console; per-transport filter and transform
+- **Field redaction** ��� mask sensitive data (`password`, `req.headers.authorization`) before any output or transport
+- **Flexible transports** �� HTTP, file (with rotation + gzip), stream, or console; per-transport filter and transform
 - **Circular buffer** — memory-efficient in-process log history (browser); zero-overhead in Node.js
 - **Fast** — on par with Pino, significantly faster than Winston and Bunyan, at 1/3 the bundle size
 - **TypeScript first** — full type safety, zero runtime dependencies
@@ -29,13 +51,7 @@
 npm install konsole-logger
 ```
 
-```bash
-yarn add konsole-logger
-```
-
-```bash
-pnpm add konsole-logger
-```
+> Also works with `yarn add konsole-logger` or `pnpm add konsole-logger`
 
 ## Quick Start
 
@@ -333,15 +349,15 @@ process.on('SIGTERM', async () => {
 
 ```typescript
 new Konsole({
-  namespace?: string;          // default: 'Global'
-  level?: LogLevelName;        // default: 'trace' (no filtering)
-  format?: KonsoleFormat;      // default: 'auto'
+  namespace?: string;          // default: 'Global' — logger identifier
+  level?: LogLevelName;        // default: 'trace' — minimum level threshold
+  format?: KonsoleFormat;      // default: 'auto' — output format (pretty/json/text/browser/silent)
   timestamp?: TimestampFormat | TimestampOptions; // default: 'datetime'
-  redact?: string[];             // field paths to mask with '[REDACTED]'
-  transports?: (Transport | TransportConfig)[];
-  maxLogs?: number;            // default: 10000 (circular buffer size)
-  defaultBatchSize?: number;   // default: 100 (viewLogs batch)
-  retentionPeriod?: number;    // default: 172800000 (48 hours)
+  redact?: string[];             // dot-notation field paths to mask with '[REDACTED]'
+  transports?: (Transport | TransportConfig)[];   // external log destinations
+  maxLogs?: number;            // default: 10000 — circular buffer capacity
+  defaultBatchSize?: number;   // default: 100 — entries per viewLogs() call
+  retentionPeriod?: number;    // default: 172800000 — 48h auto-cleanup
   cleanupInterval?: number;    // default: 3600000 (1 hour)
   useWorker?: boolean;         // default: false
 })
@@ -433,11 +449,36 @@ const logger = new Konsole({
 logger.info('User action', { event: 'click', target: 'checkout' });
 ```
 
-No other structured logging library offers this.
+No other structured logging library offers cross-platform worker offloading.
+
+## CDN / Script Tag
+
+Konsole ships a UMD build — use it directly in the browser without a bundler:
+
+```html
+<script src="https://unpkg.com/konsole-logger/dist/konsole.umd.cjs"></script>
+<script>
+  const logger = new Konsole.Konsole({ namespace: 'App' });
+  logger.info('Hello from the browser!');
+</script>
+```
+
+## Coming from Pino?
+
+Konsole uses a Pino-compatible JSON schema and calling conventions:
+
+```typescript
+// Pino                              // Konsole
+const logger = pino()                const logger = new Konsole({ namespace: 'App' })
+logger.info({ userId: 1 }, 'msg')   logger.info('msg', { userId: 1 })
+logger.child({ reqId: 'abc' })      logger.child({ reqId: 'abc' })
+```
+
+Key differences: built-in browser support, built-in redaction, built-in file rotation, zero dependencies, and `~10 KB` gzipped vs Pino's `~32 KB`.
 
 ## Requirements
 
-- **Node.js ≥ 18** for server-side use (native `fetch`). Older versions must pass `fetchImpl` to `TransportConfig`.
+- **Node.js >= 18** for server-side use (native `fetch`). Older versions must pass `fetchImpl` to `TransportConfig`.
 
 ## License
 
@@ -447,6 +488,6 @@ MIT © Sakti Kumar Chourasia
 
 <div align="center">
 
-🐛 [Report Bug](https://github.com/shakcho/console-logger/issues) · ✨ [Request Feature](https://github.com/shakcho/console-logger/issues)
+[Report Bug](https://github.com/shakcho/console-logger/issues) | [Request Feature](https://github.com/shakcho/console-logger/issues) | [Docs](https://console-logger.saktichourasia.dev/docs/)
 
 </div>
