@@ -55,7 +55,7 @@ npm install konsole-logger
 
 ## Quick Start
 
-> **Note:** The exported class is named `Konsole` (with a K) because `Console` is a reserved global in JavaScript. The library and brand name is **Console**.
+> **Note:** The exported class is named `Konsole` (with a K) because `Console` is a reserved global in JavaScript.
 
 ```typescript
 import { Konsole } from 'konsole-logger';
