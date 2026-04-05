@@ -238,15 +238,21 @@ logger.setTimestamp('unixMs');
   },
   {
     title: 'Transports',
-    description: 'Ship logs to files, streams, or HTTP endpoints with batching and retry.',
+    description: 'Ship logs to files (with rotation + gzip), streams, or HTTP endpoints with batching and retry.',
     code: `import { Konsole, FileTransport } from 'konsole-logger';
 
 const logger = new Konsole({
   namespace: 'App',
   format: 'pretty',         // pretty in terminal
   transports: [
-    new FileTransport({     // JSON to disk
+    new FileTransport({     // JSON to disk with rotation
       path: '/var/log/app.log',
+      rotation: {
+        maxSize: 10 * 1024 * 1024, // 10 MB per file
+        interval: 'daily',         // also rotate at midnight
+        maxFiles: 7,               // keep 7 old files
+        compress: true,            // gzip rotated files
+      },
     }),
     {                       // HTTP — batched POST
       name: 'datadog',
@@ -350,7 +356,10 @@ app.use((req, res, next) => {
 });
 
 // Flush to disk on shutdown
-const file = new FileTransport({ path: './logs/app.log' });
+const file = new FileTransport({
+  path: './logs/app.log',
+  rotation: { maxSize: 10 * 1024 * 1024, maxFiles: 5 },
+});
 logger.addTransport(file);
 
 process.on('SIGTERM', async () => {
@@ -653,7 +662,7 @@ export default function KonsoleSite() {
               { icon: '⏱️', title: 'Configurable timestamps', body: "Full date+time by default. Presets: ISO 8601, epoch seconds/ms, time-only. Custom functions. Nanosecond precision via highResolution. Change format at runtime." },
               { icon: '🎨', title: 'Auto formatting', body: "TTY terminal → ANSI pretty. Pipe / CI → NDJSON. Browser → styled %c badges. One format: 'auto' option handles it all." },
               { icon: '🔒', title: 'Field redaction', body: "Mask sensitive data with redact: ['password', 'req.headers.authorization']. Applied before output, transports, and buffer. Children inherit parent paths. Disable at runtime in browser DevTools for debugging." },
-              { icon: '🚚', title: 'Transports', body: 'HttpTransport, FileTransport, StreamTransport, ConsoleTransport. Add multiple to one logger. Filter and transform per transport.' },
+              { icon: '🚚', title: 'Transports', body: 'HttpTransport, FileTransport (with rotation + gzip), StreamTransport, ConsoleTransport. Add multiple to one logger. Filter and transform per transport.' },
               { icon: '🧵', title: 'Worker transport', body: 'useWorker: true moves log storage and HTTP batching off the main thread — Web Worker in browsers, worker_threads in Node.js. Your app never blocks on logging, even at high volume.' },
               { icon: '💾', title: 'In-browser log history', body: 'Circular buffer stores logs in memory for DevTools inspection via getLogs() and exposeToWindow(). In Node.js, buffer is off by default for maximum throughput.' },
               { icon: '⚡', title: 'Fast & lightweight', body: '~10 KB gzipped, zero dependencies. On par with Pino on overhead, faster on JSON serialization, and significantly faster than Winston and Bunyan — at 1/3 the bundle size.' },

@@ -177,6 +177,30 @@ interface KonsoleChildOptions {
 
 ---
 
+## RotationOptions
+
+Configuration for file rotation on `FileTransport`.
+
+```typescript
+interface RotationOptions {
+  maxSize?: number;
+  interval?: 'daily' | 'hourly' | number;
+  maxFiles?: number;
+  compress?: boolean;
+}
+```
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `maxSize` | `number` | — | Rotate when file exceeds this size in bytes |
+| `interval` | `'daily' \| 'hourly' \| number` | — | Rotate on a time schedule (`'daily'`, `'hourly'`, or ms) |
+| `maxFiles` | `number` | `5` | Maximum rotated files to retain; oldest are deleted |
+| `compress` | `boolean` | `false` | Gzip-compress rotated files (`.gz` suffix) |
+
+Rotated files use numeric suffixes: `app.log.1` (newest) → `app.log.2` → etc. The current log file always stays at the configured path. When both `maxSize` and `interval` are set, rotation triggers on whichever condition is met first.
+
+---
+
 ## TransportConfig
 
 Configuration for an HTTP transport (auto-wrapped in `HttpTransport`).

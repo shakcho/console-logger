@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.0] - 2026-04-05
+
+### Added
+
+- **File rotation** — New `rotation` option on `FileTransportOptions`
+  - Size-based rotation: `maxSize` in bytes (e.g. `10 * 1024 * 1024` for 10 MB)
+  - Time-based rotation: `interval` accepts `'daily'`, `'hourly'`, or a number (ms)
+  - Retention: `maxFiles` caps the number of rotated files (default: 5); oldest are deleted
+  - Compression: `compress: true` gzip-compresses rotated files asynchronously (`.gz` suffix)
+  - Naming: numeric suffix — `app.log` → `app.log.1` → `app.log.2`; current file stays at configured path
+  - No entry loss: writes during rotation are buffered and flushed after the new file opens
+  - Byte counter seeded from existing file size on append mode — rotation triggers correctly on restart
+  - New export: `RotationOptions` type
+
+---
+
 ## [4.3.0] - 2026-03-30
 
 ### Added

@@ -20,7 +20,7 @@ export type { ConsoleTransportOptions }             from './transports/ConsoleTr
 export { StreamTransport }                          from './transports/StreamTransport';
 export type { StreamTransportOptions, WritableLike } from './transports/StreamTransport';
 export { FileTransport }                            from './transports/FileTransport';
-export type { FileTransportOptions }                from './transports/FileTransport';
+export type { FileTransportOptions, RotationOptions } from './transports/FileTransport';
 export type { FileFormat }                          from './transports/base';
 
 // ─── Levels ───────────────────────────────────────────────────────────────────

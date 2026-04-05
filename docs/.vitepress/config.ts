@@ -9,7 +9,7 @@ export default defineConfig({
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
     ['meta', { name: 'description', content: 'Console is a structured, namespaced logging library for JavaScript and TypeScript. Works in browser and Node.js. Numeric log levels, child loggers, beautiful terminal output, and flexible transports.' }],
-    ['meta', { name: 'keywords', content: 'javascript logger, typescript logger, structured logging, namespaced logging, browser logging, node logger, child logger, pino, pino alternative, ndjson, log levels' }],
+    ['meta', { name: 'keywords', content: 'javascript logger, typescript logger, structured logging, namespaced logging, browser logger, node logger, child logger, pino, pino alternative, winston, bunyan, ndjson, log levels, zero dependency, isomorphic, file rotation, log rotation, devtools, lightweight, fast logger, esm' }],
     ['meta', { property: 'og:description', content: 'Structured, namespaced logging for browser and Node.js. Numeric log levels, child loggers, beautiful terminal output, and flexible transports.' }],
   ],
 
@@ -19,9 +19,9 @@ export default defineConfig({
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'API', link: '/api/' },
-      { text: 'Live Demo', link: 'https://konsole.saktichourasia.dev' },
+      { text: 'Live Demo', link: 'https://console-logger.saktichourasia.dev' },
       {
-        text: 'v4.2.0',
+        text: 'v4.4.0',
         items: [
           { text: 'Changelog', link: '/changelog' },
           { text: 'Contributing', link: '/contributing' },

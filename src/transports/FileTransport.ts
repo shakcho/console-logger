@@ -3,6 +3,17 @@ import { toLine, type FileFormat } from './base';
 import { StreamTransport, type StreamTransportOptions, type WritableLike } from './StreamTransport';
 import type { LogEntry } from '../types';
 
+export interface RotationOptions {
+  /** Rotate when file exceeds this size in bytes. e.g. `10 * 1024 * 1024` for 10 MB. */
+  maxSize?: number;
+  /** Rotate on a time interval: `'daily'` | `'hourly'` | number (ms). */
+  interval?: 'daily' | 'hourly' | number;
+  /** Maximum number of rotated files to retain. Oldest are deleted. Default: 5. */
+  maxFiles?: number;
+  /** Gzip-compress rotated files. Default: false. */
+  compress?: boolean;
+}
+
 export interface FileTransportOptions {
   /** Absolute or relative path of the log file. */
   path: string;
@@ -22,6 +33,8 @@ export interface FileTransportOptions {
   flags?: 'a' | 'w';
   /** Only write entries that pass this predicate. */
   filter?: (entry: LogEntry) => boolean;
+  /** File rotation configuration. Omit to disable rotation. */
+  rotation?: RotationOptions;
 }
 
 /**
@@ -44,12 +57,27 @@ export interface FileTransportOptions {
  *   ],
  * });
  * ```
+ *
+ * @example
+ * ```ts
+ * // With rotation: 10 MB per file, keep 7 rotated files, compress old files
+ * new FileTransport({
+ *   path: '/var/log/app.log',
+ *   rotation: { maxSize: 10 * 1024 * 1024, maxFiles: 7, compress: true },
+ * });
+ * ```
  */
 export class FileTransport extends StreamTransport {
   private isReady = false;
   private pendingEntries: LogEntry[] = [];
   private filePath: string;
+  private fileFlags: string;
   private initialized: Promise<void>;
+  private rotationOpts: RotationOptions | undefined;
+  private bytesWritten = 0;
+  private rotating = false;
+  private rotationInProgress: Promise<void> | null = null;
+  private rotationTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: FileTransportOptions) {
     if (!isNode) {
@@ -63,21 +91,32 @@ export class FileTransport extends StreamTransport {
       filter: options.filter,
     } satisfies StreamTransportOptions);
 
-    this.filePath    = options.path;
-    this.initialized = this.openFile(options.flags ?? 'a');
+    this.filePath     = options.path;
+    this.fileFlags    = options.flags ?? 'a';
+    this.rotationOpts = options.rotation;
+    this.initialized  = this.openFile(this.fileFlags);
   }
 
   /** Override write to buffer entries until the file stream is open. */
   override write(entry: LogEntry): void {
     if (this.filter && !this.filter(entry)) return;
-    if (!this.isReady) {
+    if (!this.isReady || this.rotating) {
       this.pendingEntries.push(entry);
       return;
     }
+    const line = toLine(entry, this.format) + '\n';
     try {
-      this.stream.write(toLine(entry, this.format) + '\n');
+      this.stream.write(line);
+      this.bytesWritten += Buffer.byteLength(line, 'utf8');
     } catch (err) {
       console.error(`[Konsole FileTransport: ${this.name}] Write error:`, err);
+    }
+    if (
+      this.rotationOpts?.maxSize &&
+      !this.rotating &&
+      this.bytesWritten >= this.rotationOpts.maxSize
+    ) {
+      this.triggerRotation();
     }
   }
 
@@ -88,6 +127,101 @@ export class FileTransport extends StreamTransport {
   ready(): Promise<void> {
     return this.initialized;
   }
+
+  override async destroy(): Promise<void> {
+    if (this.rotationTimer) {
+      clearTimeout(this.rotationTimer);
+      this.rotationTimer = null;
+    }
+    if (this.rotationInProgress) await this.rotationInProgress;
+    return new Promise((resolve) => {
+      this.stream.end(() => resolve());
+    });
+  }
+
+  // ─── Rotation ──────────────────────────────────────────────────────────────
+
+  private triggerRotation(): void {
+    if (this.rotating) return;
+    this.rotating = true;
+    this.rotationInProgress = this.rotate().finally(() => {
+      this.rotationInProgress = null;
+    });
+  }
+
+  private async rotate(): Promise<void> {
+    // 1. Close current stream
+    await new Promise<void>((resolve) => {
+      this.stream.end(() => resolve());
+    });
+
+    const maxFiles = this.rotationOpts?.maxFiles ?? 5;
+
+    // 2. Shift rotated files
+    await shiftFiles(this.filePath, maxFiles);
+
+    // 3. Compress the freshly rotated file if requested
+    if (this.rotationOpts?.compress) {
+      // Fire-and-forget — compression runs in background
+      compressFile(`${this.filePath}.1`).catch(() => {
+        // Compression failure is non-fatal
+      });
+    }
+
+    // 4. Open a new file stream
+    await this.openFile('a');
+
+    // 5. Resume — isReady set by openFile, pending flushed there
+    this.rotating = false;
+    this.bytesWritten = 0;
+
+    // Flush entries that arrived during rotation
+    for (const entry of this.pendingEntries) {
+      const line = toLine(entry, this.format) + '\n';
+      this.stream.write(line);
+      this.bytesWritten += Buffer.byteLength(line, 'utf8');
+    }
+    this.pendingEntries = [];
+
+    // Reschedule timer-based rotation
+    this.scheduleTimerRotation();
+  }
+
+  private scheduleTimerRotation(): void {
+    if (this.rotationTimer) {
+      clearTimeout(this.rotationTimer);
+      this.rotationTimer = null;
+    }
+    const interval = this.rotationOpts?.interval;
+    if (!interval) return;
+
+    let delayMs: number;
+    const now = Date.now();
+
+    if (interval === 'daily') {
+      const next = new Date();
+      next.setHours(24, 0, 0, 0);
+      delayMs = next.getTime() - now;
+    } else if (interval === 'hourly') {
+      const next = new Date();
+      next.setMinutes(60, 0, 0);
+      delayMs = next.getTime() - now;
+    } else {
+      delayMs = interval;
+    }
+
+    this.rotationTimer = setTimeout(() => {
+      this.rotationTimer = null;
+      if (!this.rotating) this.triggerRotation();
+    }, delayMs);
+
+    // Don't keep the process alive just for rotation
+    if (typeof this.rotationTimer === 'object' && 'unref' in this.rotationTimer) {
+      this.rotationTimer.unref();
+    }
+  }
+
+  // ─── File open ─────────────────────────────────────────────────────────────
 
   private async openFile(flags: string): Promise<void> {
     // Vite externalizes node:fs as a CJS module — named-export destructuring
@@ -110,11 +244,81 @@ export class FileTransport extends StreamTransport {
     this.stream  = fileStream;
     this.isReady = true;
 
+    // Seed bytesWritten from existing file size when appending
+    if (flags === 'a' && this.rotationOpts) {
+      try {
+        const fsp = await import('node:fs/promises');
+        const stat =
+          fsp.stat ?? (fsp as unknown as { default?: typeof import('node:fs/promises') }).default?.stat;
+        if (typeof stat === 'function') {
+          const st = await stat(this.filePath);
+          this.bytesWritten = st.size;
+        }
+      } catch {
+        // File may not exist yet — that's fine, start at 0
+      }
+    }
+
     // Flush entries that arrived before the stream was ready
     for (const entry of this.pendingEntries) {
       this.stream.write(toLine(entry, this.format) + '\n');
     }
     this.pendingEntries = [];
+
+    // Schedule time-based rotation
+    this.scheduleTimerRotation();
+  }
+}
+
+// ─── Rotation helpers ──────────────────────────────────────────────────────────
+
+async function shiftFiles(basePath: string, maxFiles: number): Promise<void> {
+  const fsp = await import('node:fs/promises');
+  const rename = fsp.rename ?? (fsp as unknown as { default?: typeof import('node:fs/promises') }).default?.rename;
+  const unlink = fsp.unlink ?? (fsp as unknown as { default?: typeof import('node:fs/promises') }).default?.unlink;
+
+  if (typeof rename !== 'function' || typeof unlink !== 'function') return;
+
+  // Delete the oldest files that exceed retention
+  for (const ext of ['', '.gz']) {
+    try { await unlink(`${basePath}.${maxFiles}${ext}`); } catch { /* ENOENT ok */ }
+  }
+
+  // Shift remaining: .{n-1} → .{n}
+  for (let i = maxFiles - 1; i >= 1; i--) {
+    for (const ext of ['', '.gz']) {
+      try { await rename(`${basePath}.${i}${ext}`, `${basePath}.${i + 1}${ext}`); } catch { /* ENOENT ok */ }
+    }
+  }
+
+  // Rotate current → .1
+  try { await rename(basePath, `${basePath}.1`); } catch { /* ENOENT ok */ }
+}
+
+async function compressFile(filePath: string): Promise<void> {
+  const fs = await import('node:fs');
+  const zlib = await import('node:zlib');
+  const { pipeline } = await import('node:stream/promises');
+
+  const createReadStream =
+    fs.createReadStream ?? (fs as unknown as { default?: typeof import('node:fs') }).default?.createReadStream;
+  const createWriteStream =
+    fs.createWriteStream ?? (fs as unknown as { default?: typeof import('node:fs') }).default?.createWriteStream;
+  const createGzip =
+    zlib.createGzip ?? (zlib as unknown as { default?: typeof import('node:zlib') }).default?.createGzip;
+
+  if (typeof createReadStream !== 'function' || typeof createWriteStream !== 'function' || typeof createGzip !== 'function') return;
+
+  await pipeline(
+    createReadStream(filePath),
+    createGzip(),
+    createWriteStream(filePath + '.gz'),
+  );
+
+  const fsp = await import('node:fs/promises');
+  const unlink = fsp.unlink ?? (fsp as unknown as { default?: typeof import('node:fs/promises') }).default?.unlink;
+  if (typeof unlink === 'function') {
+    await unlink(filePath);
   }
 }
 
