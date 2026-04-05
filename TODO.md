@@ -148,9 +148,23 @@ Goal: universal logging library (Browser + Node.js) competitive with Pino.js, wi
   - [ ] `setLevel()` should throw (or warn) on invalid level strings — currently silent undefined behavior
   - [ ] Guard `child()` against non-serializable bindings (circular refs will throw in worker `postMessage`)
 
-- [ ] **Auto metadata in Node.js** *(moved from P3 — low effort, high aggregator compat)*
-  - [ ] Include `pid` and `hostname` in JSON log entries automatically (Pino parity, used by Datadog/Loki for routing)
-  - [ ] Opt-out via `{ pid: false, hostname: false }` on `KonsoleOptions`
+- [ ] **Pino API compatibility (Phase 1 — quick wins, ~15 lines)**
+  - [ ] `logger.level` getter/setter property (currently only `setLevel()` method)
+  - [ ] `logger.isLevelEnabled(level)` — check if a level would be logged
+  - [ ] `logger.bindings()` — return current merged bindings
+  - [ ] `logger.flush()` — alias for `flushTransports()` (Pino naming)
+
+- [ ] **Pino API compatibility (Phase 2 — base fields)**
+  - [ ] `base` option on `KonsoleOptions`: `{ pid?: boolean, hostname?: boolean }`
+  - [ ] Include `pid` and `hostname` in JSON log entries (Pino parity, used by Datadog/Loki for routing)
+  - [ ] Cache `os.hostname()` at logger creation (expensive call)
+  - [ ] Merge base fields into every entry in `addLog()`
+
+- [ ] **Pino API compatibility — NOT pursuing**
+  - Pino's calling convention (`obj, msg` object-first) — Konsole's message-first is intentional
+  - `customLevels` — Konsole is opinionated with 6 standard levels
+  - `hooks` system — complex, performance cost; users can wrap methods
+  - Full `formatters` system — Konsole has fixed formatter implementations
 
 - [ ] **Numeric epoch timestamps in JSON**
   - [ ] Option to emit `"time": 1718448225123` (epoch ms) instead of ISO string in JSON output for fast parsing (Pino parity)

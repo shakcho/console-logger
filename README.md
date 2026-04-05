@@ -1,4 +1,4 @@
-# Konsole
+# Console
 
 <div align="center">
 
@@ -16,9 +16,9 @@
 
 ---
 
-## Why Konsole?
+## Why Console?
 
-| Feature | Konsole | Pino | Winston | Bunyan |
+| Feature | Console | Pino | Winston | Bunyan |
 |---------|:-------:|:----:|:-------:|:------:|
 | Browser support | **Native** | No | No | No |
 | Worker offloading | **Yes** | No | No | No |
@@ -35,12 +35,12 @@
 
 - **Browser-first, Node.js ready** — worker transport (Web Worker / `worker_threads`) keeps the main thread free
 - **Six numeric log levels** — trace / debug / info / warn / error / fatal
-- **Structured output** ��� consistent JSON schema, compatible with Datadog, Loki, CloudWatch
+- **Structured output** — consistent JSON schema, compatible with Datadog, Loki, CloudWatch
 - **Beautiful terminal output** — ANSI colors on TTY, NDJSON in pipes, styled badges in DevTools
 - **Configurable timestamps** — full date+time by default, ISO 8601, epoch, nanosecond precision, or custom format
 - **Child loggers** — attach request-scoped context that flows into every log line
-- **Field redaction** ��� mask sensitive data (`password`, `req.headers.authorization`) before any output or transport
-- **Flexible transports** �� HTTP, file (with rotation + gzip), stream, or console; per-transport filter and transform
+- **Field redaction** — mask sensitive data (`password`, `req.headers.authorization`) before any output or transport
+- **Flexible transports** — HTTP, file (with rotation + gzip), stream, or console; per-transport filter and transform
 - **Circular buffer** — memory-efficient in-process log history (browser); zero-overhead in Node.js
 - **Fast** — on par with Pino, significantly faster than Winston and Bunyan, at 1/3 the bundle size
 - **TypeScript first** — full type safety, zero runtime dependencies
@@ -54,6 +54,8 @@ npm install konsole-logger
 > Also works with `yarn add konsole-logger` or `pnpm add konsole-logger`
 
 ## Quick Start
+
+> **Note:** The exported class is named `Konsole` (with a K) because `Console` is a reserved global in JavaScript. The library and brand name is **Console**.
 
 ```typescript
 import { Konsole } from 'konsole-logger';
@@ -453,7 +455,7 @@ No other structured logging library offers cross-platform worker offloading.
 
 ## CDN / Script Tag
 
-Konsole ships a UMD build — use it directly in the browser without a bundler:
+Console ships a UMD build — use it directly in the browser without a bundler:
 
 ```html
 <script src="https://unpkg.com/konsole-logger/dist/konsole.umd.cjs"></script>
@@ -465,14 +467,17 @@ Konsole ships a UMD build — use it directly in the browser without a bundler:
 
 ## Coming from Pino?
 
-Konsole uses a Pino-compatible JSON schema and calling conventions:
+Console uses a Pino-compatible JSON schema. The calling conventions are similar but not identical:
 
 ```typescript
-// Pino                              // Konsole
-const logger = pino()                const logger = new Konsole({ namespace: 'App' })
-logger.info({ userId: 1 }, 'msg')   logger.info('msg', { userId: 1 })
-logger.child({ reqId: 'abc' })      logger.child({ reqId: 'abc' })
+// Pino                                    // Konsole
+const logger = pino()                      const logger = new Konsole({ namespace: 'App' })
+logger.info({ userId: 1 }, 'msg')          logger.info('msg', { userId: 1 })
+logger.info({ msg: 'hi', userId: 1 })      logger.info({ msg: 'hi', userId: 1 })
+logger.child({ reqId: 'abc' })             logger.child({ reqId: 'abc' })
 ```
+
+> **Note:** Pino puts the object first (`obj, 'msg'`). Console puts the string first (`'msg', obj`) or uses `{ msg, ...fields }` object syntax. Both produce the same JSON output.
 
 Key differences: built-in browser support, built-in redaction, built-in file rotation, zero dependencies, and `~10 KB` gzipped vs Pino's `~32 KB`.
 
