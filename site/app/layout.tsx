@@ -14,7 +14,7 @@ const ibmPlexMono = IBM_Plex_Mono({
   variable: '--font-mono',
 });
 
-const siteUrl = 'https://konsole.saktichourasia.dev';
+const siteUrl = 'https://console-logger.saktichourasia.dev';
 const title = 'Console — Structured logging for browser & Node.js';
 const description = 'Zero-dependency, TypeScript-first logging library with six numeric log levels, child loggers, beautiful ANSI terminal output, browser DevTools styling, and flexible transports. Works in browser and Node.js.';
 

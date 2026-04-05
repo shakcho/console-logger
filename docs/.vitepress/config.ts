@@ -19,9 +19,9 @@ export default defineConfig({
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'API', link: '/api/' },
-      { text: 'Live Demo', link: 'https://konsole.saktichourasia.dev' },
+      { text: 'Live Demo', link: 'https://console-logger.saktichourasia.dev' },
       {
-        text: 'v4.2.0',
+        text: 'v4.4.0',
         items: [
           { text: 'Changelog', link: '/changelog' },
           { text: 'Contributing', link: '/contributing' },

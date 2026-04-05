@@ -18,7 +18,7 @@
 - **Configurable timestamps** — full date+time by default, ISO 8601, epoch, nanosecond precision, or custom format
 - **Child loggers** — attach request-scoped context that flows into every log line
 - **Field redaction** — mask sensitive data (`password`, `req.headers.authorization`) before any output or transport
-- **Flexible transports** — HTTP, file, stream, or console; per-transport filter and transform
+- **Flexible transports** — HTTP, file (with rotation + gzip), stream, or console; per-transport filter and transform
 - **Circular buffer** — memory-efficient in-process log history (browser); zero-overhead in Node.js
 - **Fast** — on par with Pino, significantly faster than Winston and Bunyan, at 1/3 the bundle size
 - **TypeScript first** — full type safety, zero runtime dependencies
@@ -280,6 +280,20 @@ const logger = new Konsole({
   transports: [
     new FileTransport({ path: '/var/log/app.log' }),
   ],
+});
+```
+
+With rotation:
+
+```typescript
+new FileTransport({
+  path: '/var/log/app.log',
+  rotation: {
+    maxSize: 10 * 1024 * 1024, // rotate at 10 MB
+    interval: 'daily',          // also rotate daily
+    maxFiles: 7,                // keep 7 rotated files
+    compress: true,             // gzip old files (.log.1.gz)
+  },
 });
 ```
 

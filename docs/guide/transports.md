@@ -139,6 +139,39 @@ const logger = new Konsole({
 | `format` | `'json' \| 'text'` | `'json'` | Line format |
 | `flags` | `'a' \| 'w'` | `'a'` | `'a'` appends; `'w'` truncates on open |
 | `filter` | `function` | — | Per-entry filter predicate |
+| `rotation` | `RotationOptions` | — | File rotation config (see below) |
+
+### File Rotation
+
+Rotate log files by size, time, or both. Rotated files use a numeric suffix — the current file always stays at the configured path:
+
+```
+app.log        ← current
+app.log.1      ← most recent rotated file
+app.log.2      ← older
+app.log.1.gz   ← compressed (when compress: true)
+```
+
+```typescript
+new FileTransport({
+  path: '/var/log/app.log',
+  rotation: {
+    maxSize: 10 * 1024 * 1024, // rotate at 10 MB
+    interval: 'daily',          // also rotate at midnight
+    maxFiles: 7,                // keep 7 rotated files
+    compress: true,             // gzip old files
+  },
+});
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `maxSize` | `number` | — | Rotate when file exceeds this many bytes |
+| `interval` | `'daily' \| 'hourly' \| number` | — | Rotate on a time schedule (number = ms) |
+| `maxFiles` | `number` | `5` | Maximum rotated files to retain |
+| `compress` | `boolean` | `false` | Gzip-compress rotated files |
+
+When both `maxSize` and `interval` are set, rotation triggers on whichever condition is met first. Entries written during rotation are buffered and flushed to the new file — no logs are lost.
 
 ## StreamTransport *(Node.js only)*
 
