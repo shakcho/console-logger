@@ -60,26 +60,43 @@ jobs:
             exit 0
           fi
 
-          # Get all commit messages since the last tag
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          # Get commit messages since the last release tag.
+          # IMPORTANT: if no tag exists we still walk only the most recent
+          # commit, NOT the full history — otherwise the very first pipeline
+          # run on a long-lived repo can pick up stale "breaking change"
+          # wording from years-old commits and ship a bogus major bump.
+          LAST_TAG=$(git tag --list 'v*' --sort=-v:refname | head -n1)
           if [ -z "$LAST_TAG" ]; then
-            COMMITS=$(git log --pretty=format:"%s" --no-merges)
+            echo "No prior version tag found — only inspecting the latest commit."
+            COMMIT_RANGE_DESC="HEAD~0..HEAD (no prior tag)"
+            COMMIT_SUBJECTS=$(git log -1 --pretty=format:"%s" --no-merges)
+            COMMIT_BODIES=$(git log -1 --pretty=format:"%B" --no-merges)
           else
-            COMMITS=$(git log "${LAST_TAG}..HEAD" --pretty=format:"%s" --no-merges)
+            COMMIT_RANGE_DESC="${LAST_TAG}..HEAD"
+            COMMIT_SUBJECTS=$(git log "${LAST_TAG}..HEAD" --pretty=format:"%s" --no-merges)
+            COMMIT_BODIES=$(git log "${LAST_TAG}..HEAD" --pretty=format:"%B" --no-merges)
           fi
 
-          echo "Commits since last release:"
-          echo "$COMMITS"
+          echo "Commits considered ($COMMIT_RANGE_DESC):"
+          echo "$COMMIT_SUBJECTS"
 
-          # Determine bump type from commit messages
-          # Conventional Commits: feat: = minor, fix: = patch, BREAKING CHANGE = major
+          # Conventional Commits classification:
+          #   feat:        → minor
+          #   fix:         → patch
+          #   type!:       → major (! before colon on the subject)
+          #   BREAKING CHANGE: footer in body → major
+          # `BREAKING CHANGE` is case-sensitive per the Conventional Commits
+          # spec and MUST end with a colon to be treated as a footer — that
+          # rules out subject lines like "updated breaking change section".
           BUMP="none"
 
-          if echo "$COMMITS" | grep -qiE "BREAKING CHANGE|^[a-z]+(\(.+\))?!:"; then
+          if echo "$COMMIT_SUBJECTS" | grep -qE "^[a-z]+(\([^)]+\))?!:"; then
             BUMP="major"
-          elif echo "$COMMITS" | grep -qE "^feat(\(.+\))?:"; then
+          elif echo "$COMMIT_BODIES" | grep -qE "(^|[[:space:]])BREAKING[ -]CHANGE:"; then
+            BUMP="major"
+          elif echo "$COMMIT_SUBJECTS" | grep -qE "^feat(\([^)]+\))?:"; then
             BUMP="minor"
-          elif echo "$COMMITS" | grep -qE "^fix(\(.+\))?:"; then
+          elif echo "$COMMIT_SUBJECTS" | grep -qE "^fix(\([^)]+\))?:"; then
             BUMP="patch"
           fi
 
