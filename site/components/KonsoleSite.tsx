@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Konsole } from 'konsole-logger';
 import type { LogEntry } from 'konsole-logger';
+import { MovableLauncher } from 'react-driftkit';
 
 // ─── Site links ───────────────────────────────────────────────────────────────
 
@@ -376,7 +377,7 @@ export default function KonsoleSite() {
   const [globalPrint, setGlobalPrint]       = useState(false);
   const [useChild, setUseChild]             = useState(false);
   const [displayLogs, setDisplayLogs]       = useState<DisplayLog[]>([]);
-  const [logIdCounter, setLogIdCounter]     = useState(0);
+  const logIdRef                            = useRef(0);
   const [drawerOpen, setDrawerOpen]         = useState(false);
   const [typeFilter, setTypeFilter]         = useState<'all' | Level>('all');
   const [nsFilter, setNsFilter]             = useState<'all' | string>('all');
@@ -396,14 +397,11 @@ export default function KonsoleSite() {
   }, []);
 
   const pushLog = useCallback((level: Level, namespace: string, msg: string, fields: Record<string, unknown> = {}) => {
-    setLogIdCounter((prev) => {
-      const id = prev + 1;
-      setDisplayLogs((logs) => [
-        ...logs.slice(-99),
-        { id, level, namespace, msg, fields, timestamp: new Date() },
-      ]);
-      return id;
-    });
+    const id = ++logIdRef.current;
+    setDisplayLogs((logs) => [
+      ...logs.slice(-99),
+      { id, level, namespace, msg, fields, timestamp: new Date() },
+    ]);
   }, []);
 
   const handleLog = (level: Level) => {
@@ -431,7 +429,7 @@ export default function KonsoleSite() {
   const clearAll = () => {
     for (const ns of NAMESPACES) loggerMap[ns].clearLogs();
     setDisplayLogs([]);
-    setLogIdCounter(0);
+    logIdRef.current = 0;
   };
 
   const getAllLogs = (): LogEntry[] => {
@@ -471,7 +469,7 @@ export default function KonsoleSite() {
     }
   }, [displayLogs]);
 
-  // Esc closes drawer
+  // Esc closes widget panel
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setDrawerOpen(false); };
     document.addEventListener('keydown', handler);
@@ -591,9 +589,6 @@ export default function KonsoleSite() {
           <div style={s.row}>
             <span style={s.rowLabel}>Controls</span>
             <div style={s.actions}>
-              <button style={{ ...s.btn, ...s.btnPrimary }} onClick={() => setDrawerOpen(true)}>
-                View Buffer
-              </button>
               <button style={s.btn} onClick={toggleGlobalPrint}>
                 Print {globalPrint ? 'on' : 'off'}
               </button>
@@ -811,16 +806,28 @@ export default function KonsoleSite() {
         </footer>
       </div>
 
+      {/* Floating buffer toggle widget */}
+      <MovableLauncher defaultPosition="bottom-right" snapToCorners
+        style={{ opacity: drawerOpen ? 0 : 1, pointerEvents: drawerOpen ? 'none' : 'auto', transition: 'opacity 0.2s ease' }}>
+        <div style={s.widget} onClick={() => setDrawerOpen(true)}>
+          <div style={s.widgetToggle}>
+            <span style={s.widgetToggleIcon}>{'>'}_</span>
+            <span style={s.widgetToggleLabel}>Buffer</span>
+            {totalBuffered > 0 && <span style={s.widgetBadgeCount}>{totalBuffered}</span>}
+          </div>
+        </div>
+      </MovableLauncher>
+
       {/* Drawer overlay */}
       <div style={{ ...s.drawerOverlay, ...(drawerOpen ? s.drawerOverlayOpen : {}) }}
         onClick={() => setDrawerOpen(false)} />
 
       {/* Log buffer drawer */}
-      <div style={{ ...s.drawer, ...(drawerOpen ? s.drawerOpen : {}) }}>
+      <div style={{ ...s.drawer, ...(drawerOpen ? s.drawerOpenStyle : {}) }}>
         <div style={s.drawerHandle} onClick={() => setDrawerOpen(false)} />
         <div style={s.drawerHeader}>
           <div style={s.drawerTitle}>
-            <span style={{ color: '#22c55e', fontWeight: 700 }}>›</span> Buffer
+            <span style={{ color: '#22c55e', fontWeight: 700 }}>{'>'}</span> Buffer
           </div>
           <div style={s.drawerFilters}>
             <div style={s.drawerFilterGroup}>
@@ -1002,11 +1009,18 @@ const s: Record<string, React.CSSProperties> = {
   footerText: { fontSize: 13, color: '#a3a3a3' },
   footerLink: { color: '#737373', textDecoration: 'none' },
 
+  // Floating widget toggle
+  widget:            { userSelect: 'none' },
+  widgetToggle:      { display: 'flex', alignItems: 'center', gap: 8, background: '#1a1a1a', border: '1px solid #333', borderRadius: 10, padding: '10px 16px', cursor: 'pointer', boxShadow: '0 4px 20px rgba(0,0,0,0.3)', fontFamily: 'var(--font-mono), monospace', color: '#e5e5e5', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap' },
+  widgetToggleIcon:  { color: '#22c55e', fontWeight: 700, fontSize: 14 },
+  widgetToggleLabel: { color: '#a3a3a3' },
+  widgetBadgeCount:  { background: '#6366f1', color: 'white', fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10, minWidth: 18, textAlign: 'center' },
+
   // Drawer
   drawerOverlay:     { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)', opacity: 0, visibility: 'hidden', transition: 'all 0.25s', zIndex: 100 },
   drawerOverlayOpen: { opacity: 1, visibility: 'visible' },
   drawer:            { position: 'fixed', bottom: 0, left: 0, right: 0, background: '#1a1a1a', borderRadius: '16px 16px 0 0', transform: 'translateY(100%)', transition: 'transform 0.3s cubic-bezier(0.32,0.72,0,1)', zIndex: 101, maxHeight: '72vh', display: 'flex', flexDirection: 'column' },
-  drawerOpen:        { transform: 'translateY(0)' },
+  drawerOpenStyle:   { transform: 'translateY(0)' },
   drawerHandle:      { display: 'flex', justifyContent: 'center', padding: 10, cursor: 'grab' },
   drawerHeader:      { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '0 16px 12px', borderBottom: '1px solid #2a2a2a', gap: 16 },
   drawerTitle:       { fontFamily: 'var(--font-mono), monospace', fontSize: 13, fontWeight: 500, color: '#737373', display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' },
