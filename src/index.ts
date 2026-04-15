@@ -50,3 +50,13 @@ export type { KonsoleWorker }   from './workerAdapter';
 
 // ─── Redaction ────────────────────────────────────────────────────────────────
 export { compileRedactPaths, applyRedaction, REDACTED } from './redact';
+
+// ─── Serializers ──────────────────────────────────────────────────────────────
+export {
+  stdSerializers,
+  serializeError,
+  serializeRequest,
+  serializeResponse,
+  applySerializers,
+} from './serializers';
+export type { Serializer, Serializers } from './serializers';

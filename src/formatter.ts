@@ -1,6 +1,23 @@
 import { isNode, isTTY, isBrowser } from './env';
 import { LEVELS, LEVEL_LABELS, type LogLevelName } from './levels';
+import { serializeError } from './serializers';
 import type { LogEntry, TimestampFormat, TimestampOptions } from './types';
+
+/**
+ * JSON.stringify replacer that expands Errors into plain objects. Without
+ * this, nested Errors (e.g. `{ err: new Error() }`) stringify to `"{}"`
+ * because Error's own properties are non-enumerable.
+ */
+function jsonReplacer(_key: string, value: unknown): unknown {
+  if (value instanceof Error) return serializeError(value);
+  return value;
+}
+
+/** Stringify any value safely, expanding Errors and tolerating circular refs. */
+export function safeStringify(val: unknown): string {
+  try { return JSON.stringify(val, jsonReplacer) ?? String(val); }
+  catch { return '[Circular]'; }
+}
 
 // ─── ANSI helpers ─────────────────────────────────────────────────────────────
 
@@ -106,11 +123,9 @@ export function formatTimestamp(
 // ─── Shared utilities ─────────────────────────────────────────────────────────
 
 function serializeValue(val: unknown): string {
-  if (val instanceof Error) return `"${val.message}"`;
+  if (val instanceof Error) return safeStringify(serializeError(val));
   if (typeof val === 'string') return val.includes(' ') ? `"${val}"` : val;
-  if (typeof val === 'object' && val !== null) {
-    try { return JSON.stringify(val); } catch { return '[Circular]'; }
-  }
+  if (typeof val === 'object' && val !== null) return safeStringify(val);
   return String(val);
 }
 
@@ -195,7 +210,7 @@ export class JsonFormatter implements Formatter {
       obj.hrTime = entry.hrTime;
     }
 
-    const line = JSON.stringify(obj);
+    const line = JSON.stringify(obj, jsonReplacer);
 
     if (isNode) {
       const dest = isStdout(entry.level) ? process.stdout : process.stderr;

@@ -5,6 +5,14 @@ import { createFormatter, resolveTimestampConfig, type Formatter, type KonsoleFo
 import { getHrTime, isBrowser } from './env';
 import { createPlatformWorker, type KonsoleWorker } from './workerAdapter';
 import { compileRedactPaths, applyRedaction } from './redact';
+import { applySerializers, serializeError } from './serializers';
+import type { Serializers } from './serializers';
+
+/** JSON replacer that expands nested Errors (keeps stack/cause visible). */
+function jsonReplacer(_key: string, value: unknown): unknown {
+  if (value instanceof Error) return serializeError(value);
+  return value;
+}
 import type {
   LogEntry,
   Transport,
@@ -36,6 +44,9 @@ function isTransportConfig(t: Transport | TransportConfig): t is TransportConfig
  * with a fresh `{}` so buffered entries don't share mutable state.
  */
 const NO_FIELDS: Record<string, unknown> = Object.freeze(Object.create(null));
+
+/** Shared frozen empty serializers map for the auto-Error-flattening fast path. */
+const EMPTY_SERIALIZERS: Serializers = Object.freeze({});
 
 /**
  * Empty function used to replace disabled log methods.
@@ -94,6 +105,11 @@ export class Konsole implements KonsolePublic {
   /** Pre-compiled redaction path segments. Empty array = no redaction. */
   private _redactPaths: string[][] = [];
 
+  /** Active field serializers. Empty object = no explicit serializers. */
+  private _serializers: Serializers = {};
+  /** Fast flag: at least one explicit serializer key is set. */
+  private _hasSerializers: boolean = false;
+
   // ── Hot-path cached flags (avoid repeated checks per log call) ──
   private _hasBindings: boolean = false;
   private _isSilent: boolean = false;
@@ -126,6 +142,7 @@ export class Konsole implements KonsolePublic {
       transports = [],
       timestamp,
       redact = [],
+      serializers,
     } = options;
 
     const tsConfig = resolveTimestampConfig(timestamp);
@@ -166,6 +183,11 @@ export class Konsole implements KonsolePublic {
     }
 
     this._redactPaths = compileRedactPaths(redact);
+
+    if (serializers) {
+      this._serializers = serializers;
+      this._hasSerializers = Object.keys(serializers).length > 0;
+    }
 
     this._createBoundMethods();
     this._rebindMethods();
@@ -377,6 +399,14 @@ export class Konsole implements KonsolePublic {
     const mergedPaths    = [...new Set([...parentPathStrs, ...childPathStrs])];
     child._redactPaths   = compileRedactPaths(mergedPaths);
 
+    // ── Serializers: child merges on top of parent (child keys win) ──
+    if (options?.serializers) {
+      child._serializers = { ...parent._serializers, ...options.serializers };
+    } else {
+      child._serializers = parent._serializers;
+    }
+    child._hasSerializers = Object.keys(child._serializers).length > 0;
+
     // ── Child-own state ──
     child.bindings          = { ...parent.bindings, ...bindings }; // bindings accumulate
     child._hasBindings      = Object.keys(child.bindings).length > 0;
@@ -586,11 +616,18 @@ export class Konsole implements KonsolePublic {
       return { msg: first, fields: NO_FIELDS };
     }
 
-    // Multiple args — join as a single message string
+    // Multiple args — join as a single message string. Errors are expanded
+    // via `serializeError` (raw `JSON.stringify(err)` would yield "{}").
     return {
-      msg: args.map((a) =>
-        typeof a === 'object' && a !== null ? JSON.stringify(a) : String(a),
-      ).join(' '),
+      msg: args.map((a) => {
+        if (a instanceof Error) {
+          try { return JSON.stringify(serializeError(a)); } catch { return a.message; }
+        }
+        if (typeof a === 'object' && a !== null) {
+          try { return JSON.stringify(a, jsonReplacer); } catch { return '[Circular]'; }
+        }
+        return String(a);
+      }).join(' '),
       fields: NO_FIELDS,
     };
   }
@@ -630,9 +667,19 @@ export class Konsole implements KonsolePublic {
     }
 
     // ── Merge bindings (skip spread when root logger has none) ──────────────
-    const mergedFields = this._hasBindings
+    let mergedFields = this._hasBindings
       ? { ...this.bindings, ...fields }
       : fields;
+
+    // ── Apply serializers (explicit map + auto Error flattening) ────────────
+    if (this._hasSerializers) {
+      mergedFields = applySerializers(mergedFields, this._serializers);
+    } else if (mergedFields !== NO_FIELDS) {
+      // Even with no explicit serializers, flatten Errors so they don't JSON
+      // to "{}" downstream. `applySerializers` is a no-op copy when no field
+      // contains an Error, so this stays cheap on the hot path.
+      mergedFields = applySerializers(mergedFields, EMPTY_SERIALIZERS);
+    }
 
     // ── Build entry ─────────────────────────────────────────────────────────
     // When buffered, ensure fields is a unique object (not the shared NO_FIELDS sentinel)
