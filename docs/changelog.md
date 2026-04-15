@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.0] - 2026-04-15
+
+### Added
+
+- **Serializers** — pluggable per-field transforms on `KonsoleOptions` and `KonsoleChildOptions`
+  - New `serializers` option accepts a `Record<string, (value) => unknown>` map
+  - Built-in `stdSerializers` for `err`, `req`, and `res` (Pino-compatible shapes)
+  - `serializeError` flattens an `Error` to `{ type, message, stack, ...customProps, cause? }` — fixes the long-standing `JSON.stringify(err) === "{}"` foot-gun
+  - `serializeRequest` / `serializeResponse` cover Node `http.IncomingMessage`, Express, and Fetch `Request`/`Response`
+  - Child loggers inherit parent serializers and can override per key
+  - New exports: `stdSerializers`, `serializeError`, `serializeRequest`, `serializeResponse`, `applySerializers`, `Serializer`, `Serializers`
+
+- **Auto Error flattening** — `Konsole.addLog` now expands any field whose value is an `Error` even when no explicit serializer is configured, so logs never silently emit `"err":{}`
+
+### Fixed
+
+- `parseArgsSlow` multi-arg join no longer renders Errors as `{}`; they're expanded via `serializeError`
+- `JsonFormatter`, `transports/base.toJsonLine`, and the pretty/text field renderer all expand nested `Error` values inside fields via a shared JSON replacer
+- Cycle safety: `err.self = err`, mutual `cause` chains, and deeply nested cyclic graphs inside custom error props all serialize without throwing — replaced with `"[Circular]"` only on the current walk path
+- Repeated non-cyclic references across sibling branches are preserved as full copies (not collapsed to `[Circular]`)
+- `toJSON` passthrough — `URL`, `Buffer`, `Date`, Decimal, Moment, Temporal, etc. round-trip through their canonical form instead of becoming `{}`
+- Own `__proto__` keys on parsed JSON payloads (e.g. `JSON.parse('{"__proto__":…}')`) survive serialization as own data properties without polluting `Object.prototype`
+- `RegExp` values on custom error props serialize to `/pattern/flags` (or expand with `source`/`flags` plus custom props), with full cycle detection
+- `applySerializers` only honors own keys on the serializer map, so a field literally named `hasOwnProperty` or `toString` no longer picks up `Object.prototype` methods
+- Fetch `Headers`, subclasses, polyfills, and `Map`-like header containers are flattened by interface (`forEach`/`entries`) instead of by `constructor.name`, so redaction paths like `req.headers.authorization` see the actual values
+- Header normalization preserves a header literally named `__proto__` as an own data property via null-prototype output objects
+
+---
+
 ## [4.4.0] - 2026-04-05
 
 ### Added
