@@ -40,6 +40,7 @@
 - **Configurable timestamps** — full date+time by default, ISO 8601, epoch, nanosecond precision, or custom format
 - **Child loggers** — attach request-scoped context that flows into every log line
 - **Field redaction** — mask sensitive data (`password`, `req.headers.authorization`) before any output or transport
+- **Serializers** — pluggable per-field transforms with built-in `err`/`req`/`res`; Errors auto-flatten to full stack/cause (no more `"err":{}`)
 - **Flexible transports** — HTTP, file (with rotation + gzip), stream, or console; per-transport filter and transform
 - **Circular buffer** — memory-efficient in-process log history (browser); zero-overhead in Node.js
 - **Fast** — on par with Pino, significantly faster than Winston and Bunyan, at 1/3 the bundle size
@@ -266,6 +267,80 @@ const paths = compileRedactPaths(['password', 'req.headers.authorization']);
 const redactedEntry = applyRedaction(entry, paths);
 ```
 
+## Serializers
+
+Serializers transform structured field values **before** any output, transport, or
+buffer write. They fix the most common logging foot-gun — `JSON.stringify(err)`
+returning `"{}"` — and let you reshape noisy objects (HTTP req/res, ORM models,
+domain entities) into something compact and useful.
+
+```typescript
+import { Konsole, stdSerializers } from 'konsole-logger';
+
+const logger = new Konsole({
+  namespace: 'App',
+  serializers: stdSerializers, // err / req / res
+});
+
+logger.error('db failure', { err: new Error('timeout') });
+// JSON: { ..., "err": { "type": "Error", "message": "timeout", "stack": "..." } }
+```
+
+**Built-in `stdSerializers`**
+
+| Key | Handles | Output |
+|-----|---------|--------|
+| `err` | `Error` instances (with `cause` chains, custom props) | `{ type, message, stack, ...customProps, cause? }` |
+| `req` | Node `http.IncomingMessage`, Express `req`, Fetch `Request` | `{ method, url, headers, remoteAddress, remotePort }` |
+| `res` | Node `http.ServerResponse`, Express `res` | `{ statusCode, headers }` |
+
+**Auto Error flattening** — even without configuring serializers, any field
+containing an `Error` is auto-expanded so it never serializes to `"{}"`:
+
+```typescript
+const logger = new Konsole({ namespace: 'App' });
+logger.error('failed', { err: new Error('boom') }); // err.stack survives
+```
+
+**Custom serializers**
+
+```typescript
+new Konsole({
+  namespace: 'App',
+  serializers: {
+    ...stdSerializers,
+    user: (u: any) => ({ id: u.id, role: u.role }), // strip PII
+  },
+});
+```
+
+**Child inheritance** — children inherit parent serializers and can override per
+key. The child below ships only `user.name`; the parent still ships `user.id`:
+
+```typescript
+const parent = new Konsole({
+  namespace: 'App',
+  serializers: { user: (u: any) => ({ id: u.id }) },
+});
+
+const child = parent.child({}, {
+  serializers: { user: (u: any) => ({ name: u.name }) },
+});
+```
+
+**Safety guarantees** — serialization is cycle-safe and JSON-safe by construction:
+
+- Path-scoped cycle detection — `err.self = err`, mutual `cause` chains, and
+  shared sub-graphs all serialize without throwing.
+- Repeated non-cyclic references across sibling branches are preserved as full
+  copies, not collapsed to `[Circular]`.
+- `toJSON`-aware — `URL`, `Buffer`, `Date`, Decimal, Moment, etc. round-trip
+  through their canonical form instead of becoming `{}`.
+- Own `__proto__` keys (e.g. from `JSON.parse('{"__proto__":...}')`) are
+  preserved as data properties without mutating any prototype.
+- Fetch `Headers` / Map-like header containers are flattened by interface so
+  redaction paths like `req.headers.authorization` actually see the value.
+
 ## Transports
 
 Ship logs to external destinations alongside (or instead of) console output:
@@ -356,6 +431,7 @@ new Konsole({
   format?: KonsoleFormat;      // default: 'auto' — output format (pretty/json/text/browser/silent)
   timestamp?: TimestampFormat | TimestampOptions; // default: 'datetime'
   redact?: string[];             // dot-notation field paths to mask with '[REDACTED]'
+  serializers?: Record<string, (value: unknown) => unknown>; // per-field transforms (use `stdSerializers` for err/req/res)
   transports?: (Transport | TransportConfig)[];   // external log destinations
   maxLogs?: number;            // default: 10000 — circular buffer capacity
   defaultBatchSize?: number;   // default: 100 — entries per viewLogs() call

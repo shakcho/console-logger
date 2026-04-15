@@ -1,15 +1,21 @@
 import { LEVELS, LEVEL_LABELS } from '../levels';
+import { serializeError } from '../serializers';
 import type { LogEntry } from '../types';
 
 export type FileFormat = 'json' | 'text';
 
 // ─── Shared serialization used by file / stream transports ───────────────────
 
+function jsonReplacer(_key: string, value: unknown): unknown {
+  if (value instanceof Error) return serializeError(value);
+  return value;
+}
+
 function serializeValue(val: unknown): string {
-  if (val instanceof Error) return val.message;
+  if (val instanceof Error) return JSON.stringify(serializeError(val));
   if (typeof val === 'string') return val;
   if (typeof val === 'object' && val !== null) {
-    try { return JSON.stringify(val); } catch { return '[Circular]'; }
+    try { return JSON.stringify(val, jsonReplacer); } catch { return '[Circular]'; }
   }
   return String(val);
 }
@@ -30,7 +36,7 @@ export function toJsonLine(entry: LogEntry): string {
   if (entry.hrTime !== undefined) {
     obj.hrTime = entry.hrTime;
   }
-  return JSON.stringify(obj);
+  return JSON.stringify(obj, jsonReplacer);
 }
 
 /** Format local date+time as YYYY-MM-DD HH:MM:SS.mmm */

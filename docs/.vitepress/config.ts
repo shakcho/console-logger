@@ -1,4 +1,13 @@
 import { defineConfig } from 'vitepress';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+// Read the package version once at config load. The release pipeline bumps
+// package.json + commits + publishes, and the next docs build picks up the
+// new version automatically — no manual edit of this file needed.
+const pkg = JSON.parse(
+  readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8'),
+) as { version: string };
 
 export default defineConfig({
   title: 'Console',
@@ -21,7 +30,7 @@ export default defineConfig({
       { text: 'API', link: '/api/' },
       { text: 'Live Demo', link: 'https://console-logger.saktichourasia.dev' },
       {
-        text: 'v4.4.0',
+        text: `v${pkg.version}`,
         items: [
           { text: 'Changelog', link: '/changelog' },
           { text: 'Contributing', link: '/contributing' },

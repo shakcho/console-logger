@@ -141,11 +141,15 @@ describe('Konsole', () => {
       expect(spy.entries[0].fields).toMatchObject({ port: 3000 });
     });
 
-    it('Error as first arg → msg = error.message, fields.err = Error', () => {
+    it('Error as first arg → msg = error.message, fields.err = serialized error', () => {
       const err = new Error('something broke');
       logger.error(err);
       expect(spy.entries[0].msg).toBe('something broke');
-      expect(spy.entries[0].fields.err).toBe(err);
+      expect(spy.entries[0].fields.err).toMatchObject({
+        type: 'Error',
+        message: 'something broke',
+      });
+      expect((spy.entries[0].fields.err as { stack: string }).stack).toContain('something broke');
     });
 
     it('multiple string args → joined into msg', () => {

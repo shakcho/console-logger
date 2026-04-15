@@ -1,5 +1,6 @@
 import type { LogLevelName } from './levels';
 import type { KonsoleFormat } from './formatter';
+import type { Serializers } from './serializers';
 
 // ─── Timestamp configuration ─────────────────────────────────────────────────
 
@@ -234,6 +235,22 @@ export interface KonsoleOptions {
    * ```
    */
   redact?: string[];
+
+  /**
+   * Field serializers applied to every log entry before output.
+   *
+   * Keys match field names; each function receives the raw field value and
+   * its return value replaces the original. Use `stdSerializers` for
+   * common cases (Error, HTTP req/res). Errors in any field are
+   * auto-flattened even without an explicit serializer.
+   *
+   * @example
+   * ```ts
+   * import { Konsole, stdSerializers } from 'konsole-logger'
+   * new Konsole({ serializers: { ...stdSerializers, user: (u) => ({ id: u.id }) } })
+   * ```
+   */
+  serializers?: Serializers;
 }
 
 /**
@@ -261,6 +278,12 @@ export interface KonsoleChildOptions {
    * a child can never redact fewer fields than its parent.
    */
   redact?: string[];
+
+  /**
+   * Additional serializers merged on top of the parent's serializers.
+   * Child serializers override parent entries with the same key.
+   */
+  serializers?: Serializers;
 }
 
 // ─── Worker message protocol ──────────────────────────────────────────────────
