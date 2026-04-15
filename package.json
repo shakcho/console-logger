@@ -1,6 +1,6 @@
 {
   "name": "konsole-logger",
-  "version": "4.4.0",
+  "version": "5.0.0",
   "type": "module",
   "description": "Structured, namespaced logging for browser and Node.js — numeric log levels, child loggers, beautiful terminal output, flexible transports",
   "main": "./dist/konsole.umd.cjs",
