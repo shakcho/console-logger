@@ -429,7 +429,7 @@ export default function KonsoleSite() {
   const clearAll = () => {
     for (const ns of NAMESPACES) loggerMap[ns].clearLogs();
     setDisplayLogs([]);
-    setLogIdCounter(0);
+    logIdRef.current = 0;
   };
 
   const getAllLogs = (): LogEntry[] => {
