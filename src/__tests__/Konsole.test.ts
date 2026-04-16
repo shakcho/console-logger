@@ -584,6 +584,126 @@ describe('Konsole', () => {
     });
   });
 
+  // ─── Pino API compat ─────────────────────────────────────────────────────────
+
+  describe('level getter/setter', () => {
+    it('returns the current level name', () => {
+      const logger = makeSilentLogger({ level: 'warn' });
+      expect(logger.level).toBe('warn');
+    });
+
+    it('defaults to trace', () => {
+      const logger = makeSilentLogger();
+      expect(logger.level).toBe('trace');
+    });
+
+    it('setter changes the level (same as setLevel)', () => {
+      const spy = new SpyTransport();
+      const logger = makeSilentLogger({ level: 'error', transports: [spy] });
+      expect(logger.level).toBe('error');
+
+      logger.level = 'debug';
+      expect(logger.level).toBe('debug');
+
+      logger.debug('now visible');
+      expect(spy.entries).toHaveLength(1);
+    });
+
+    it('child inherits parent level name', () => {
+      const parent = makeSilentLogger({ level: 'warn' });
+      const child = parent.child({ x: 1 });
+      expect(child.level).toBe('warn');
+    });
+
+    it('child level override is reflected in getter', () => {
+      const parent = makeSilentLogger({ level: 'trace' });
+      const child = parent.child({}, { level: 'error' });
+      expect(child.level).toBe('error');
+    });
+
+    it('setLevel updates the getter', () => {
+      const logger = makeSilentLogger({ level: 'info' });
+      logger.setLevel('fatal');
+      expect(logger.level).toBe('fatal');
+    });
+  });
+
+  describe('isLevelEnabled', () => {
+    it('returns true for levels at or above threshold', () => {
+      const logger = makeSilentLogger({ level: 'warn' });
+      expect(logger.isLevelEnabled('warn')).toBe(true);
+      expect(logger.isLevelEnabled('error')).toBe(true);
+      expect(logger.isLevelEnabled('fatal')).toBe(true);
+    });
+
+    it('returns false for levels below threshold', () => {
+      const logger = makeSilentLogger({ level: 'warn' });
+      expect(logger.isLevelEnabled('trace')).toBe(false);
+      expect(logger.isLevelEnabled('debug')).toBe(false);
+      expect(logger.isLevelEnabled('info')).toBe(false);
+    });
+
+    it('all levels enabled at trace', () => {
+      const logger = makeSilentLogger({ level: 'trace' });
+      expect(logger.isLevelEnabled('trace')).toBe(true);
+      expect(logger.isLevelEnabled('fatal')).toBe(true);
+    });
+
+    it('updates after setLevel', () => {
+      const logger = makeSilentLogger({ level: 'error' });
+      expect(logger.isLevelEnabled('info')).toBe(false);
+      logger.setLevel('info');
+      expect(logger.isLevelEnabled('info')).toBe(true);
+    });
+  });
+
+  describe('bindings()', () => {
+    it('root logger returns empty object', () => {
+      const logger = makeSilentLogger();
+      expect(logger.bindings()).toEqual({});
+    });
+
+    it('child returns its merged bindings', () => {
+      const parent = makeSilentLogger();
+      const child = parent.child({ requestId: 'abc', userId: 42 });
+      expect(child.bindings()).toEqual({ requestId: 'abc', userId: 42 });
+    });
+
+    it('nested child accumulates bindings', () => {
+      const root = makeSilentLogger();
+      const mid = root.child({ requestId: 'r1' });
+      const leaf = mid.child({ component: 'db' });
+      expect(leaf.bindings()).toEqual({ requestId: 'r1', component: 'db' });
+    });
+
+    it('returns a copy — mutations do not affect the logger', () => {
+      const parent = makeSilentLogger();
+      const child = parent.child({ key: 'value' });
+      const b = child.bindings();
+      b.key = 'mutated';
+      expect(child.bindings().key).toBe('value');
+    });
+  });
+
+  describe('flush()', () => {
+    it('resolves without error', async () => {
+      const logger = makeSilentLogger();
+      await expect(logger.flush()).resolves.toBeUndefined();
+    });
+
+    it('calls flush on transports', async () => {
+      const transport: Transport = {
+        name: 'flushable',
+        write: () => {},
+        flush: vi.fn().mockResolvedValue(undefined),
+        destroy: vi.fn().mockResolvedValue(undefined),
+      };
+      const logger = makeSilentLogger({ transports: [transport] });
+      await logger.flush();
+      expect(transport.flush).toHaveBeenCalledOnce();
+    });
+  });
+
   // ─── Graceful Shutdown ───────────────────────────────────────────────────────
 
   describe('shutdown', () => {
