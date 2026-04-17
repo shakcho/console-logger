@@ -51,6 +51,9 @@ export type { KonsoleWorker }   from './workerAdapter';
 // ─── Redaction ────────────────────────────────────────────────────────────────
 export { compileRedactPaths, applyRedaction, REDACTED } from './redact';
 
+// ─── Debug filtering ─────────────────────────────────────────────────────────
+export { isNamespaceEnabled, hasDebugFilter } from './debugFilter';
+
 // ─── Serializers ──────────────────────────────────────────────────────────────
 export {
   stdSerializers,

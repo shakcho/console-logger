@@ -90,6 +90,14 @@ export type Criteria = boolean | ((logEntry: LogEntry) => boolean);
  * Public interface for Konsole logger — safe to expose to untrusted code (e.g. via exposeToWindow).
  */
 export interface KonsolePublic {
+  /** Current minimum log level name. Readable and writable. */
+  level: LogLevelName;
+  /** Check whether a given level would produce output at the current threshold. */
+  isLevelEnabled(level: LogLevelName): boolean;
+  /** Returns a shallow copy of the current accumulated bindings. */
+  bindings(): Record<string, unknown>;
+  /** Flush all pending transport batches immediately. */
+  flush(): Promise<void>;
   viewLogs(batchSize?: number): void;
 }
 

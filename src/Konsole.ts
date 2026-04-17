@@ -6,6 +6,7 @@ import { getHrTime, isBrowser } from './env';
 import { createPlatformWorker, type KonsoleWorker } from './workerAdapter';
 import { compileRedactPaths, applyRedaction } from './redact';
 import { applySerializers, serializeError } from './serializers';
+import { hasDebugFilter, isNamespaceEnabled } from './debugFilter';
 import type { Serializers } from './serializers';
 
 /** JSON replacer that expands nested Errors (keeps stack/cause visible). */
@@ -87,12 +88,13 @@ export class Konsole implements KonsolePublic {
 
   private logs: CircularBuffer<LogEntry>;
   private namespace: string;
-  private bindings: Record<string, unknown> = {};
+  private _bindings: Record<string, unknown> = {};
   private criteria: Criteria;
   private formatter: Formatter;
   private currentFormat: KonsoleFormat;
   private timestampFormat: TimestampFormat;
   private highResolution: boolean;
+  private _levelName: LogLevelName = 'trace';
   private minLevelValue: number;
   private defaultBatchSize: number;
   private currentBatchStart: number = 0;
@@ -117,6 +119,8 @@ export class Konsole implements KonsolePublic {
   private _bufferEnabled: boolean = true;
   /** True when there are zero consumers — silent + no buffer + no transports + no worker. */
   private _isNoop: boolean = false;
+  /** True when the logger was disabled by DEBUG env var filtering. Forces full noop. */
+  private _debugDisabled: boolean = false;
   /** Cached bound log functions — created once per instance, reused by _rebindMethods. */
   private _bound!: {
     trace: (...args: unknown[]) => void;
@@ -149,6 +153,7 @@ export class Konsole implements KonsolePublic {
 
     this.namespace        = namespace;
     this.criteria         = criteria;
+    this._levelName       = level;
     this.minLevelValue    = LEVELS[level];
     this.currentFormat    = format;
     this.timestampFormat  = tsConfig.format;
@@ -163,6 +168,11 @@ export class Konsole implements KonsolePublic {
     this._bufferEnabled = buffer ?? isBrowser;
     this.logs = new CircularBuffer<LogEntry>(this._bufferEnabled ? maxLogs : 0);
     this._isSilent = format === 'silent' || (typeof criteria === 'boolean' && !criteria);
+
+    // DEBUG env var namespace filtering — fully disable loggers that don't match
+    if (hasDebugFilter() && !isNamespaceEnabled(namespace)) {
+      this._debugDisabled = true;
+    }
 
     for (const t of transports) {
       this.transports.push(isTransportConfig(t) ? new HttpTransport(t) : t);
@@ -379,6 +389,7 @@ export class Konsole implements KonsolePublic {
 
     // ── Overridable per-child values ──
     child.namespace     = options?.namespace ?? parent.namespace;
+    child._levelName    = options?.level ?? parent._levelName;
     child.minLevelValue = options?.level ? LEVELS[options.level] : parent.minLevelValue;
 
     // ── Timestamp config (override or inherit) ──
@@ -408,9 +419,16 @@ export class Konsole implements KonsolePublic {
     child._hasSerializers = Object.keys(child._serializers).length > 0;
 
     // ── Child-own state ──
-    child.bindings          = { ...parent.bindings, ...bindings }; // bindings accumulate
-    child._hasBindings      = Object.keys(child.bindings).length > 0;
+    child._bindings         = { ...parent._bindings, ...bindings }; // bindings accumulate
+    child._hasBindings      = Object.keys(child._bindings).length > 0;
     child._isSilent         = parent._isSilent;
+    child._debugDisabled    = parent._debugDisabled;
+
+    // DEBUG env var: child with a different namespace may need its own filter check
+    if (options?.namespace && hasDebugFilter()) {
+      child._debugDisabled = !isNamespaceEnabled(child.namespace);
+    }
+
     child._hasTransports    = child.transports.length > 0;
     child._bufferEnabled    = parent._bufferEnabled;
     child._updateNoop();
@@ -453,8 +471,55 @@ export class Konsole implements KonsolePublic {
 
   /** Update the minimum log level at runtime. */
   setLevel(level: LogLevelName): void {
+    this._levelName = level;
     this.minLevelValue = LEVELS[level];
     this._rebindMethods();
+  }
+
+  /**
+   * Returns the current minimum log level name.
+   * Pino-compatible property — use `logger.level` to read or write.
+   */
+  get level(): LogLevelName {
+    return this._levelName;
+  }
+
+  /**
+   * Sets the minimum log level at runtime.
+   * Pino-compatible property — equivalent to `setLevel()`.
+   */
+  set level(level: LogLevelName) {
+    this.setLevel(level);
+  }
+
+  /**
+   * Check whether a given level would produce output at the current threshold.
+   *
+   * @example
+   * ```ts
+   * if (logger.isLevelEnabled('debug')) {
+   *   logger.debug('expensive computation', { result: compute() });
+   * }
+   * ```
+   */
+  isLevelEnabled(level: LogLevelName): boolean {
+    return LEVELS[level] >= this.minLevelValue;
+  }
+
+  /**
+   * Returns a shallow copy of the current accumulated bindings.
+   * Root loggers return `{}`; child loggers return the merged parent+child bindings.
+   */
+  bindings(): Record<string, unknown> {
+    return { ...this._bindings };
+  }
+
+  /**
+   * Flush all pending transport batches immediately.
+   * Alias for `flushTransports()` — Pino-compatible naming.
+   */
+  async flush(): Promise<void> {
+    return this.flushTransports();
   }
 
   /** Update the fine-grained criteria filter. @deprecated Prefer `setLevel()`. */
@@ -668,7 +733,7 @@ export class Konsole implements KonsolePublic {
 
     // ── Merge bindings (skip spread when root logger has none) ──────────────
     let mergedFields = this._hasBindings
-      ? { ...this.bindings, ...fields }
+      ? { ...this._bindings, ...fields }
       : fields;
 
     // ── Apply serializers (explicit map + auto Error flattening) ────────────
@@ -748,7 +813,7 @@ export class Konsole implements KonsolePublic {
   }
 
   private _updateNoop(): void {
-    this._isNoop = this._isSilent && !this._bufferEnabled && !this._hasTransports && !this.useWorker;
+    this._isNoop = this._debugDisabled || (this._isSilent && !this._bufferEnabled && !this._hasTransports && !this.useWorker);
   }
 
   /** Create cached bound log functions — one set per instance, reused by _rebindMethods. */

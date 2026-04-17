@@ -125,19 +125,20 @@ Goal: universal logging library (Browser + Node.js) competitive with Pino.js, wi
   - [x] Browser-only `disableRedaction()` runtime toggle via `exposeToWindow()`
   - [x] Exported utilities: `compileRedactPaths()`, `applyRedaction()`, `REDACTED`
 
-- [ ] **Serializers**
-  - [ ] `serializers` option: `{ err: ..., req: ..., res: ... }`
-  - [ ] Ship built-in `stdSerializers` for `Error`, HTTP `req`/`res`
+- [x] **Serializers**
+  - [x] `serializers` option: `{ err: ..., req: ..., res: ... }`
+  - [x] Ship built-in `stdSerializers` for `Error`, HTTP `req`/`res`
 
 - [x] **Graceful shutdown**
   - [x] `Konsole.shutdown()` flushes and destroys all registered loggers
   - [x] `Konsole.enableShutdownHook()` registers `SIGTERM`/`SIGINT`/`beforeExit` handlers (Node.js only)
   - [x] Idempotent — safe to call `enableShutdownHook()` multiple times
 
-- [ ] **`DEBUG=*` namespace filtering**
-  - [ ] Support `DEBUG=konsole:*` env var pattern (like the `debug` npm package)
-  - [ ] Allows namespace-level enable/disable without code changes — drop-in upgrade path for teams using `debug`
-  - [ ] Glob/wildcard matching: `DEBUG=konsole:http,konsole:db` or `DEBUG=*`
+- [x] **`DEBUG=*` namespace filtering**
+  - [x] Support `DEBUG=konsole:*` env var pattern (like the `debug` npm package)
+  - [x] Allows namespace-level enable/disable without code changes — drop-in upgrade path for teams using `debug`
+  - [x] Glob/wildcard matching: `DEBUG=konsole:http,konsole:db` or `DEBUG=*`
+  - [x] Negation support: `DEBUG=*,-App:verbose` disables specific namespaces
 
 - [ ] **Transport error observability**
   - [ ] `HttpTransport` `onError(err, droppedEntries)` callback option — currently silent on failure after retries
@@ -148,11 +149,11 @@ Goal: universal logging library (Browser + Node.js) competitive with Pino.js, wi
   - [ ] `setLevel()` should throw (or warn) on invalid level strings — currently silent undefined behavior
   - [ ] Guard `child()` against non-serializable bindings (circular refs will throw in worker `postMessage`)
 
-- [ ] **Pino API compatibility (Phase 1 — quick wins, ~15 lines)**
-  - [ ] `logger.level` getter/setter property (currently only `setLevel()` method)
-  - [ ] `logger.isLevelEnabled(level)` — check if a level would be logged
-  - [ ] `logger.bindings()` — return current merged bindings
-  - [ ] `logger.flush()` — alias for `flushTransports()` (Pino naming)
+- [x] **Pino API compatibility (Phase 1 — quick wins)**
+  - [x] `logger.level` getter/setter property (currently only `setLevel()` method)
+  - [x] `logger.isLevelEnabled(level)` — check if a level would be logged
+  - [x] `logger.bindings()` — return current merged bindings
+  - [x] `logger.flush()` — alias for `flushTransports()` (Pino naming)
 
 - [ ] **Pino API compatibility (Phase 2 — base fields)**
   - [ ] `base` option on `KonsoleOptions`: `{ pid?: boolean, hostname?: boolean }`
