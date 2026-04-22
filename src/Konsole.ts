@@ -7,6 +7,7 @@ import { createPlatformWorker, type KonsoleWorker } from './workerAdapter';
 import { compileRedactPaths, applyRedaction } from './redact';
 import { applySerializers, serializeError } from './serializers';
 import { hasDebugFilter, isNamespaceEnabled } from './debugFilter';
+import { enableContext, runWithContext, getContext, getActiveContext } from './context';
 import type { Serializers } from './serializers';
 
 /** JSON replacer that expands nested Errors (keeps stack/cause visible). */
@@ -331,6 +332,29 @@ export class Konsole implements KonsolePublic {
   static addGlobalTransport(config: TransportConfig): void {
     Konsole.instances.forEach((instance) => instance.addTransport(config));
   }
+
+  // ─── Async context propagation (Node.js) ──────────────────────────────────
+  //
+  // AsyncLocalStorage-backed scope binding. Call `enableContext()` once at
+  // startup, then wrap request-scoped work in `runWithContext(store, fn)` —
+  // every log entry inside the scope auto-merges `store` into its fields.
+  // Browser: `runWithContext` just invokes `fn()`; context is a no-op.
+  //
+  // @example
+  // ```ts
+  // await Konsole.enableContext();
+  //
+  // app.use((req, _res, next) => {
+  //   Konsole.runWithContext({ requestId: req.id }, () => next());
+  // });
+  // ```
+
+  /** Initialize `AsyncLocalStorage` for context propagation. Node.js only; no-op in browsers. */
+  static enableContext = enableContext;
+  /** Run `fn` in a scope whose `store` is auto-merged into every log entry produced inside it. */
+  static runWithContext = runWithContext;
+  /** Read the current context store, or `undefined` if none is active. */
+  static getContext = getContext;
 
   // ─── Child loggers ─────────────────────────────────────────────────────────
 
@@ -731,10 +755,20 @@ export class Konsole implements KonsolePublic {
       ({ msg, fields } = this.parseArgsSlow(args));
     }
 
-    // ── Merge bindings (skip spread when root logger has none) ──────────────
-    let mergedFields = this._hasBindings
-      ? { ...this._bindings, ...fields }
-      : fields;
+    // ── Merge ALS context + bindings + call-site fields ─────────────────────
+    // Precedence (low → high): ALS context < child bindings < call-site fields.
+    // getActiveContext is null-fast when no-one has ever called runWithContext.
+    const ctx = getActiveContext();
+    let mergedFields: Record<string, unknown>;
+    if (ctx) {
+      mergedFields = this._hasBindings
+        ? { ...ctx, ...this._bindings, ...fields }
+        : (fields === NO_FIELDS ? { ...ctx } : { ...ctx, ...fields });
+    } else {
+      mergedFields = this._hasBindings
+        ? { ...this._bindings, ...fields }
+        : fields;
+    }
 
     // ── Apply serializers (explicit map + auto Error flattening) ────────────
     if (this._hasSerializers) {

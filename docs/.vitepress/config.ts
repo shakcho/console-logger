@@ -52,6 +52,7 @@ export default defineConfig({
           text: 'Core Concepts',
           items: [
             { text: 'Namespaces & Child Loggers', link: '/guide/namespaces' },
+            { text: 'Async Context Propagation', link: '/guide/async-context' },
             { text: 'Log Levels & Output', link: '/guide/conditional-logging' },
             { text: 'Timestamps', link: '/guide/timestamps' },
             { text: 'Redaction', link: '/guide/redaction' },

@@ -39,6 +39,7 @@
 - **Beautiful terminal output** — ANSI colors on TTY, NDJSON in pipes, styled badges in DevTools
 - **Configurable timestamps** — full date+time by default, ISO 8601, epoch, nanosecond precision, or custom format
 - **Child loggers** — attach request-scoped context that flows into every log line
+- **Async context propagation** — `runWithContext()` auto-binds `requestId`/`traceId` through async scope via `AsyncLocalStorage` — no child threading
 - **Field redaction** — mask sensitive data (`password`, `req.headers.authorization`) before any output or transport
 - **Serializers** — pluggable per-field transforms with built-in `err`/`req`/`res`; Errors auto-flatten to full stack/cause (no more `"err":{}`)
 - **Flexible transports** — HTTP, file (with rotation + gzip), stream, or console; per-transport filter and transform
@@ -209,6 +210,54 @@ const child = logger.child(
 ```
 
 Children are ephemeral — not registered in `Konsole.instances`, share the parent's buffer.
+
+## Async Context Propagation (Node.js)
+
+Bind request-scoped fields to an async scope once, and every log inside (through `await`, `setTimeout`, `Promise.then`, middleware chains) auto-includes them — no child-logger plumbing:
+
+```typescript
+import { Konsole } from 'konsole-logger';
+
+const logger = new Konsole({ namespace: 'API' });
+
+// One-time init at app startup
+await Konsole.enableContext();
+
+// Express / Fastify / Hono middleware
+app.use((req, _res, next) => {
+  Konsole.runWithContext({ requestId: req.id, userId: req.user?.id }, () => next());
+});
+
+// Anywhere downstream — no need to thread a child logger
+async function chargeCustomer(amount: number) {
+  logger.info('charging', { amount });
+  // → { msg: 'charging', amount, requestId: 'r_abc', userId: 42 }
+  await db.charge(amount);
+}
+```
+
+**Precedence** (low → high): ALS context < child bindings < call-site fields. Call-site always wins; bindings override context on key collision.
+
+**Nested scopes merge:**
+
+```typescript
+Konsole.runWithContext({ requestId: 'r1' }, () => {
+  Konsole.runWithContext({ userId: 'u1' }, () => {
+    logger.info('both apply');
+    // → fields: { requestId: 'r1', userId: 'u1' }
+  });
+});
+```
+
+**Zero overhead when unused** — `AsyncLocalStorage` is lazy-loaded. Apps that never call `enableContext()` pay a single null check per log call. Browser: `runWithContext` invokes `fn()` directly; context is a no-op.
+
+**API:**
+
+| Method | Description |
+|--------|-------------|
+| `await Konsole.enableContext()` | One-time init (loads `node:async_hooks`). Safe to call multiple times. |
+| `Konsole.runWithContext(store, fn)` | Run `fn` with `store` merged into every log entry inside the scope. Returns `fn`'s result. |
+| `Konsole.getContext()` | Read the current store, or `undefined` if no scope is active. |
 
 ## Redaction
 
@@ -471,6 +520,9 @@ new Konsole({
 | `Konsole.addGlobalTransport(transport)` | Add a transport to all existing loggers |
 | `Konsole.shutdown()` | Flush and destroy all registered loggers |
 | `Konsole.enableShutdownHook()` | Register SIGTERM/SIGINT/beforeExit handlers (Node.js only) |
+| `Konsole.enableContext()` | Initialize `AsyncLocalStorage` for context propagation (Node.js only) |
+| `Konsole.runWithContext(store, fn)` | Run `fn` in an async scope whose fields are merged into every log entry |
+| `Konsole.getContext()` | Read the current async context store |
 
 ## Browser Debugging
 
@@ -555,7 +607,7 @@ logger.child({ reqId: 'abc' })             logger.child({ reqId: 'abc' })
 
 > **Note:** Pino puts the object first (`obj, 'msg'`). Console puts the string first (`'msg', obj`) or uses `{ msg, ...fields }` object syntax. Both produce the same JSON output.
 
-Key differences: built-in browser support, built-in redaction, built-in file rotation, zero dependencies, and `~10 KB` gzipped vs Pino's `~32 KB`.
+Key differences: built-in browser support, built-in redaction, built-in file rotation, built-in async context propagation (no `pino-http` / `cls-hooked` needed), zero dependencies, and `~10 KB` gzipped vs Pino's `~32 KB`.
 
 ## Requirements
 

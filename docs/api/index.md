@@ -24,6 +24,11 @@ import {
   applyRedaction,
   REDACTED,
 
+  // Async context propagation
+  enableContext,
+  runWithContext,
+  getContext,
+
   // Types
   LogEntry,
   Transport,          // interface
@@ -33,6 +38,7 @@ import {
   KonsolePublic,
   TimestampFormat,
   TimestampOptions,
+  ContextStore,
   Criteria,
   FileFormat,
 } from 'konsole-logger';
@@ -54,6 +60,9 @@ import Konsole from 'konsole-logger';
 | `Konsole.addGlobalTransport(config)` | `void` | Add transport to every logger |
 | `Konsole.shutdown()` | `Promise<void>` | Flush and destroy all registered loggers |
 | `Konsole.enableShutdownHook()` | `void` | Register SIGTERM/SIGINT/beforeExit handlers |
+| `Konsole.enableContext()` | `Promise<void>` | Initialize `AsyncLocalStorage` for async context propagation (Node.js) |
+| `Konsole.runWithContext(store, fn)` | `T` | Run `fn` with `store` merged into log entries in the async scope |
+| `Konsole.getContext()` | `ContextStore \| undefined` | Read the current async context store |
 
 ### Instance Methods
 

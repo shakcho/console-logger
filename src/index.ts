@@ -9,7 +9,10 @@ export type {
   TransportConfig,
 } from './Konsole';
 
-export type { TimestampFormat, TimestampOptions } from './types';
+export type { TimestampFormat, TimestampOptions, ContextStore } from './types';
+
+// ─── Async context propagation ───────────────────────────────────────────────
+export { enableContext, runWithContext, getContext } from './context';
 
 export { CircularBuffer } from './CircularBuffer';
 
