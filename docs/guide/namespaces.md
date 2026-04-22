@@ -147,3 +147,7 @@ export async function login(req: Request) {
   }
 }
 ```
+
+::: tip When to use child loggers vs. async context
+Child loggers are great for **explicit, component-scoped** context that travels with a logger reference (like `component: 'db'`). For **request-scoped** fields that should follow execution across `await` boundaries without threading a logger through every call, use [async context propagation](./async-context) instead.
+:::

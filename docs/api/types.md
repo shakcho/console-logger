@@ -300,6 +300,26 @@ type LogLevelName = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 
 ---
 
+## ContextStore
+
+```typescript
+type ContextStore = Record<string, unknown>;
+```
+
+The key/value bag propagated through async scope via [`Konsole.runWithContext`](/api/konsole#runwithcontext). Merged into every log entry produced inside the scope — see the [Async Context Propagation guide](/guide/async-context).
+
+```typescript
+import { Konsole, type ContextStore } from 'konsole-logger';
+
+const baseCtx: ContextStore = { service: 'payments', region: 'us-east-1' };
+
+Konsole.runWithContext({ ...baseCtx, requestId: 'r_abc' }, () => {
+  logger.info('charged');
+});
+```
+
+---
+
 ## FileFormat
 
 ```typescript

@@ -175,10 +175,13 @@ Goal: universal logging library (Browser + Node.js) competitive with Pino.js, wi
 
 ## P3 — Advanced
 
-- [ ] **AsyncLocalStorage context propagation** (Node.js)
-  - [ ] `Konsole.runWithContext(store, fn)` to bind context to async scope
-  - [ ] Auto-merge context store into every log entry within the scope
-  - [ ] Enables automatic `requestId` propagation in Express/Fastify middleware without passing child loggers manually
+- [x] **AsyncLocalStorage context propagation** (Node.js)
+  - [x] `Konsole.runWithContext(store, fn)` to bind context to async scope
+  - [x] Auto-merge context store into every log entry within the scope
+  - [x] Enables automatic `requestId` propagation in Express/Fastify middleware without passing child loggers manually
+  - [x] `Konsole.enableContext()` — awaitable init for `node:async_hooks`
+  - [x] `Konsole.getContext()` — read current store (for debugging)
+  - [x] Browser no-op (returns `fn()` directly); lazy-loaded in Node — zero overhead when unused
 
 - [ ] **API ergonomics cleanup**
   - [ ] Rename `criteria` → keep as advanced `filter` option, `level` handles common case

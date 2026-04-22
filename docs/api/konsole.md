@@ -149,6 +149,68 @@ Konsole.addGlobalTransport({
 
 ---
 
+### enableContext
+
+```typescript
+static enableContext(): Promise<void>
+```
+
+Initializes `AsyncLocalStorage` for async context propagation. Lazily loads `node:async_hooks` — Node.js only; no-op in browsers. Idempotent (repeated calls return the same promise).
+
+Call once during app startup, before the first `runWithContext`:
+
+```typescript
+await Konsole.enableContext();
+```
+
+See the [Async Context Propagation guide](/guide/async-context) for full usage.
+
+---
+
+### runWithContext
+
+```typescript
+static runWithContext<T>(store: ContextStore, fn: () => T): T
+```
+
+Runs `fn` inside an async scope whose `store` is merged into every log entry produced by any logger within the scope. Returns `fn`'s result.
+
+Nested scopes merge with parent context; inner keys shadow outer keys. Precedence for log fields is `ALS context < child bindings < call-site fields`.
+
+Node.js only — in browsers, `fn` is invoked directly with no context binding.
+
+**Parameters:**
+- `store` — `Record<string, unknown>` merged into every log entry inside the scope
+- `fn` — function to run; can be sync or async
+
+**Example (Express):**
+```typescript
+app.use((req, _res, next) => {
+  Konsole.runWithContext({ requestId: req.id, userId: req.user?.id }, () => next());
+});
+```
+
+**Throws** in Node.js if called before `enableContext()` has resolved.
+
+---
+
+### getContext
+
+```typescript
+static getContext(): ContextStore | undefined
+```
+
+Returns the current async context store, or `undefined` when no scope is active.
+
+```typescript
+Konsole.runWithContext({ requestId: 'r1' }, () => {
+  Konsole.getContext(); // { requestId: 'r1' }
+});
+Konsole.getContext(); // undefined
+```
+
+---
+
 ## Instance Methods — Logging
 
 ### trace

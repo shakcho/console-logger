@@ -87,6 +87,12 @@ export type SerializableLogEntry = {
 export type Criteria = boolean | ((logEntry: LogEntry) => boolean);
 
 /**
+ * Key/value bag propagated through async scope via `Konsole.runWithContext`.
+ * Merged into every log entry produced inside the scope (ALS < bindings < call-site).
+ */
+export type ContextStore = Record<string, unknown>;
+
+/**
  * Public interface for Konsole logger — safe to expose to untrusted code (e.g. via exposeToWindow).
  */
 export interface KonsolePublic {

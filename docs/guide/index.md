@@ -5,6 +5,7 @@ Console is a structured, namespaced logging library for JavaScript and TypeScrip
 - **Structured logging** with a consistent JSON schema
 - **Namespaced logging** for organized, component-specific logs
 - **Child loggers** that inherit config and attach request-scoped context
+- **Async context propagation** — `runWithContext()` auto-binds `requestId`/`traceId` across async boundaries (Node.js)
 - **Beautiful terminal output** with ANSI colors and human-readable formatting
 - **Field redaction** — mask sensitive data before it reaches any destination
 - **Multiple transports** — HTTP, file, stream, or console
@@ -58,6 +59,7 @@ Console solves all of these while remaining lightweight and dependency-free.
 - [Getting Started](/guide/getting-started) — Installation and basic usage
 - [Configuration](/guide/configuration) — All available options
 - [Namespaces & Child Loggers](/guide/namespaces) — Organizing logs and attaching context
+- [Async Context Propagation](/guide/async-context) — Automatic `requestId` / `traceId` via `AsyncLocalStorage`
 - [Log Levels & Output](/guide/conditional-logging) — Controlling what gets logged
 - [Timestamps](/guide/timestamps) — Format presets, custom functions, and nanosecond precision
 - [Redaction](/guide/redaction) — Masking passwords, tokens, and PII

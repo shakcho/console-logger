@@ -163,6 +163,12 @@ When `useWorker: true`, logs are written to **both** the main-thread `CircularBu
 
 Worker creation is handled by `createPlatformWorker()` in `src/workerAdapter.ts`, which returns a unified `KonsoleWorker` interface. In browsers it uses `Blob` + `URL.createObjectURL` to create a Web Worker; in Node.js it dynamically imports `worker_threads` and prepends a shim that maps `parentPort` onto the `self.onmessage`/`self.postMessage` convention. Messages sent before the async Node.js import resolves are buffered and flushed once the worker is ready.
 
+### Async context propagation (Node.js)
+
+`src/context.ts` exposes `enableContext()`, `runWithContext(store, fn)`, `getContext()` — re-exported on the `Konsole` class as static methods. Backed by `node:async_hooks.AsyncLocalStorage`, lazily loaded on first call to `enableContext()` / `runWithContext()` so apps that never use context pay zero overhead (`als === null` short-circuit in `getActiveContext()`).
+
+`addLog()` calls `getActiveContext()` on every entry and merges with precedence `{ ...ctx, ...bindings, ...fields }` — call-site fields win, then child bindings, then ALS context. Nested `runWithContext` calls merge into the parent store (we wrap `AsyncLocalStorage.run` to spread outer into inner) so middleware stacking produces the union of all active contexts. Browser: `runWithContext` just invokes `fn()`; context is a no-op.
+
 ### Console output control
 
 `criteria` (deprecated) controls whether the formatter prints output. It can be `boolean` or `(entry: LogEntry) => boolean`. The global flag `Konsole.enableGlobalPrint(true)` overrides all per-instance criteria — useful for unsilencing all loggers in a production DevTools session via `Konsole.exposeToWindow()` / `window.__Konsole`.
