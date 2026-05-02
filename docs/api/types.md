@@ -214,6 +214,9 @@ interface TransportConfig {
   batchSize?: number;
   flushInterval?: number;
   retryAttempts?: number;
+  maxQueueSize?: number;
+  overflowStrategy?: 'drop-oldest' | 'drop-newest';
+  onError?: (err: Error, droppedEntries: LogEntry[]) => void;
   filter?: (entry: LogEntry) => boolean;
   transform?: (entry: LogEntry) => unknown;
   fetchImpl?: typeof fetch;
@@ -231,6 +234,9 @@ interface TransportConfig {
 | `batchSize` | `number` | `50` | Entries per batch |
 | `flushInterval` | `number` | `10000` | Auto-flush interval (ms) |
 | `retryAttempts` | `number` | `3` | Retry attempts with exponential backoff |
+| `maxQueueSize` | `number` | `Infinity` | Cap on pending batches awaiting send |
+| `overflowStrategy` | `'drop-oldest' \| 'drop-newest'` | `'drop-oldest'` | What to drop when `maxQueueSize` is reached |
+| `onError` | `function` | — | Called when a batch is permanently dropped (retries exhausted or evicted by `maxQueueSize`). Receives the underlying `Error` and the dropped entries. |
 | `filter` | `function` | — | Only forward entries matching predicate |
 | `transform` | `function` | — | Transform entry before sending |
 | `fetchImpl` | `typeof fetch` | `globalThis.fetch` | Custom fetch (required on Node.js < 18) |

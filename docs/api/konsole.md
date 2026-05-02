@@ -333,6 +333,8 @@ db.debug('Query', { sql: 'SELECT...', ms: 4 });
 // → DBG  [App:DB]  Query  requestId=abc ip=1.2.3.4 component=db sql="SELECT..." ms=4
 ```
 
+**Worker-mode bindings:** when the parent logger was constructed with `useWorker: true`, `child()` runs a `structuredClone` probe over `bindings` and throws `TypeError` if they aren't structured-cloneable (functions, symbols, class instances with private fields, etc.). This converts what would otherwise be a confusing crash on the first log call into a clear error at the call site. Circular references are fine — `structuredClone` handles them natively.
+
 ---
 
 ## Instance Methods — Configuration
@@ -345,9 +347,15 @@ setLevel(level: LogLevelName): void
 
 Changes the minimum log level at runtime. Entries below the new level are discarded immediately.
 
+Throws `TypeError` when given a name that isn't one of `'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal'`. The `logger.level = …` setter delegates to this method, so it has the same validation.
+
 **Example:**
 ```typescript
 logger.setLevel('error'); // only error and fatal from now on
+
+// Bad input fails loudly instead of silently breaking the threshold:
+logger.setLevel('verbose');
+// → TypeError: [Konsole] Invalid log level: "verbose". Expected one of: trace, debug, info, warn, error, fatal.
 ```
 
 ---
