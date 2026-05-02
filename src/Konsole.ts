@@ -1,6 +1,6 @@
 import { CircularBuffer } from './CircularBuffer';
 import { HttpTransport } from './transports/HttpTransport';
-import { LEVELS, type LogLevelName } from './levels';
+import { LEVELS, isValidLevel, type LogLevelName } from './levels';
 import { createFormatter, resolveTimestampConfig, type Formatter, type KonsoleFormat } from './formatter';
 import { getHrTime, isBrowser } from './env';
 import { createPlatformWorker, type KonsoleWorker } from './workerAdapter';
@@ -382,6 +382,21 @@ export class Konsole implements KonsolePublic {
    * ```
    */
   child(bindings: Record<string, unknown>, options?: KonsoleChildOptions): Konsole {
+    // When useWorker is enabled, bindings flow through postMessage (structured
+    // clone), which throws on functions, symbols, classes with private fields,
+    // etc. Catching it now produces a clear error at the call-site instead of
+    // a cryptic crash on the first log call.
+    if (this.useWorker && typeof structuredClone === 'function') {
+      try {
+        structuredClone(bindings);
+      } catch (err) {
+        throw new TypeError(
+          `[Konsole] child() bindings must be structured-cloneable when useWorker: true. ` +
+          `Functions, symbols, and circular references are not allowed. ` +
+          `Underlying error: ${(err as Error).message}`,
+        );
+      }
+    }
     return Konsole.createChild(this, bindings, options);
   }
 
@@ -493,8 +508,19 @@ export class Konsole implements KonsolePublic {
 
   // ─── Instance management ───────────────────────────────────────────────────
 
-  /** Update the minimum log level at runtime. */
+  /**
+   * Update the minimum log level at runtime.
+   * Throws `TypeError` on an invalid level name — silent acceptance previously
+   * left the logger in an undefined state (LEVELS[bad] === undefined breaks
+   * every comparison) and was very hard to diagnose.
+   */
   setLevel(level: LogLevelName): void {
+    if (!isValidLevel(level as string)) {
+      throw new TypeError(
+        `[Konsole] Invalid log level: ${JSON.stringify(level)}. ` +
+        `Expected one of: trace, debug, info, warn, error, fatal.`,
+      );
+    }
     this._levelName = level;
     this.minLevelValue = LEVELS[level];
     this._rebindMethods();

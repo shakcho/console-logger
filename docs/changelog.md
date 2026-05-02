@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Transport error observability** — failures are no longer silent
+  - `HttpTransport` `onError(err, droppedEntries)` callback fires when a batch is permanently dropped (retries exhausted *or* evicted by `maxQueueSize`); receives the underlying `Error` and the dropped entries
+  - `HttpTransport` `maxQueueSize` caps the pending-batch queue (default `Infinity`); previously the retry queue was unbounded
+  - `HttpTransport` `overflowStrategy: 'drop-oldest' | 'drop-newest'` controls eviction (default `'drop-oldest'` — favours fresh data)
+  - `StreamTransport` (and `FileTransport` by inheritance) now respects `stream.write()` returning `false`: pauses, queues entries in memory, and resumes on `'drain'` instead of dropping logs on the floor
+  - `StreamTransport` / `FileTransport` accept `maxQueueSize`, `overflowStrategy`, and `onDrop(entries, reason)` to bound the backpressure queue and surface drops
+  - Across `FileTransport` rotations the new file stream gets its own `'drain'` listener and the paused state is reset, so backpressure handling carries over
+
+- **Input validation**
+  - `setLevel(level)` and the `logger.level = …` setter now throw `TypeError` on a name that isn't one of `trace | debug | info | warn | error | fatal`. Previously `LEVELS[bad] === undefined` left the threshold in an undefined state — silently breaking every level comparison
+  - `child(bindings)` runs a `structuredClone` probe over `bindings` when the parent was constructed with `useWorker: true` and throws `TypeError` if they aren't structured-cloneable (functions, symbols, class instances with private fields). Converts a cryptic worker `postMessage` crash on the first log call into a clear error at the call site. Circular references remain supported
+
+### Fixed
+
+- `WritableLike` interface now declares `on('drain', listener)` overload so streams that emit `'drain'` are typed correctly
+
+---
+
+## [5.1.0] - 2026-04-22
+
+### Added
+
+- **AsyncLocalStorage context propagation** (Node.js)
+  - `Konsole.enableContext()` lazily initializes `node:async_hooks` — apps that never use context pay zero overhead
+  - `Konsole.runWithContext(store, fn)` binds a context store to an async scope; every log entry produced inside it auto-merges `store` into its fields
+  - `Konsole.getContext()` reads the current store (useful for debugging)
+  - Nested `runWithContext` calls merge into the parent store (outer spread into inner) — middleware stacking produces the union of all active contexts
+  - Merge precedence at log time: ALS context < child bindings < call-site fields
+  - Browser is a no-op — `runWithContext` just invokes `fn()` directly
+  - Enables automatic `requestId` propagation in Express/Fastify middleware without threading child loggers through every call
+
+---
+
+## [5.0.1] - 2026-04-17
+
+### Added
+
+- **`DEBUG=*` namespace filtering** — drop-in replacement for the `debug` npm package
+  - Reads the `DEBUG` env var at logger construction time (Node.js only)
+  - Glob/wildcard matching: `DEBUG=konsole:*`, `DEBUG=konsole:http,konsole:db`, `DEBUG=*`
+  - Negation support: `DEBUG=*,-App:verbose` enables everything except `App:verbose`
+  - Loggers whose namespace doesn't match are fully short-circuited (`_debugDisabled` flag forces noop methods, no entry construction)
+
+- **Pino API compatibility — Phase 1**
+  - `logger.level` getter/setter property — read or write the current threshold (delegates to `setLevel()`)
+  - `logger.isLevelEnabled(level)` — cheap predicate to gate expensive log construction
+  - `logger.bindings()` — returns a shallow copy of the merged child bindings
+  - `logger.flush()` — alias for `flushTransports()` (Pino naming)
+
+---
+
 ## [5.0.0] - 2026-04-15
 
 ### Added

@@ -40,6 +40,9 @@ const logger = new Konsole({
 | `batchSize` | `number` | `50` | Entries per batch before auto-flush |
 | `flushInterval` | `number` | `10000` | Auto-flush interval (ms) |
 | `retryAttempts` | `number` | `3` | Retry attempts with exponential backoff |
+| `maxQueueSize` | `number` | `Infinity` | Cap on pending batches awaiting send |
+| `overflowStrategy` | `'drop-oldest' \| 'drop-newest'` | `'drop-oldest'` | What to drop when `maxQueueSize` is reached |
+| `onError` | `function` | — | Called when a batch is permanently dropped (retries exhausted or queue overflow) |
 | `filter` | `function` | — | Only forward entries that pass the predicate |
 | `transform` | `function` | — | Transform an entry before sending |
 | `fetchImpl` | `typeof fetch` | `globalThis.fetch` | Custom fetch (required on Node.js < 18) |
@@ -56,6 +59,26 @@ Failed requests are retried with exponential backoff:
 - Attempt 2: 1 second delay
 - Attempt 3: 2 second delay
 - (controlled by `retryAttempts`)
+
+### Handling Permanent Failures
+
+A batch is "permanently dropped" when retry attempts are exhausted, or when `maxQueueSize` evicts it before it could be sent. By default these drops are silent — wire up `onError` to surface them:
+
+```typescript
+{
+  name: 'backend',
+  url: 'https://logs.example.com/ingest',
+  retryAttempts: 5,
+  maxQueueSize: 1000,                  // never queue more than 1000 batches
+  overflowStrategy: 'drop-oldest',     // keep the freshest data
+  onError: (err, droppedEntries) => {
+    metrics.increment('log.dropped', droppedEntries.length);
+    fallbackLogger.error('Log batch dropped', { reason: err.message });
+  },
+}
+```
+
+The callback receives the underlying `Error` (HTTP status, network failure, or a `queue overflow` sentinel) and the dropped log entries. Exceptions thrown from `onError` are caught and logged to `console.warn` — the transport keeps running.
 
 ### HTTP Payload Schema
 
@@ -140,6 +163,9 @@ const logger = new Konsole({
 | `flags` | `'a' \| 'w'` | `'a'` | `'a'` appends; `'w'` truncates on open |
 | `filter` | `function` | — | Per-entry filter predicate |
 | `rotation` | `RotationOptions` | — | File rotation config (see below) |
+| `maxQueueSize` | `number` | `Infinity` | Cap on entries buffered under backpressure (see *StreamTransport › Backpressure*) |
+| `overflowStrategy` | `'drop-oldest' \| 'drop-newest'` | `'drop-oldest'` | What to drop when `maxQueueSize` is reached |
+| `onDrop` | `function` | — | Called when entries are dropped from the backpressure queue |
 
 ### File Rotation
 
@@ -192,7 +218,7 @@ const logger = new Konsole({
 });
 ```
 
-The `WritableLike` interface requires `write(chunk: string)`, `end(cb?)`, and `on('error', fn)`. Standard Node.js streams satisfy this out of the box.
+The `WritableLike` interface requires `write(chunk: string)`, `end(cb?)`, and `on('error' | 'drain', fn)`. Standard Node.js streams satisfy this out of the box.
 
 ### Options
 
@@ -202,6 +228,28 @@ The `WritableLike` interface requires `write(chunk: string)`, `end(cb?)`, and `o
 | `name` | `string` | `'stream'` | Transport name |
 | `format` | `'json' \| 'text'` | `'json'` | Line format |
 | `filter` | `function` | — | Per-entry filter predicate |
+| `maxQueueSize` | `number` | `Infinity` | Cap on entries buffered while paused under backpressure |
+| `overflowStrategy` | `'drop-oldest' \| 'drop-newest'` | `'drop-oldest'` | What to drop when `maxQueueSize` is reached |
+| `onDrop` | `function` | — | Called when entries are dropped from the backpressure queue |
+
+### Backpressure
+
+When `stream.write()` returns `false`, the stream's internal buffer is full. `StreamTransport` pauses, queues subsequent entries in memory, and resumes on the stream's `'drain'` event — no log lines are silently dropped on the floor.
+
+The queue is unbounded by default. For long-lived processes with a permanently slow consumer, cap it explicitly:
+
+```typescript
+new StreamTransport({
+  stream: slowSink,
+  maxQueueSize: 10_000,
+  overflowStrategy: 'drop-oldest',          // favour fresh data
+  onDrop: (entries, reason) => {
+    metrics.increment('log.dropped', entries.length, { reason });
+  },
+});
+```
+
+The same backpressure handling applies to `FileTransport` (which extends `StreamTransport`) — including across rotations, since the new file stream gets its own `'drain'` listener.
 
 ## Filtering and Transforming
 
