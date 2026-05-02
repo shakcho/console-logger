@@ -163,6 +163,159 @@ describe('HttpTransport', () => {
     await t.destroy();
   });
 
+  it('fires onError when retries are exhausted', async () => {
+    const warnSpy   = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const failFetch = makeFetch(false, 500);
+    const onError   = vi.fn();
+
+    const t = new HttpTransport({
+      name: 'on-error',
+      url: 'http://localhost/logs',
+      batchSize: 1,
+      retryAttempts: 0, // exhaust immediately
+      fetchImpl: failFetch,
+      onError,
+    });
+
+    const entry = makeEntry({ msg: 'will-be-dropped' });
+    t.write(entry);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onError).toHaveBeenCalledOnce();
+    const [err, dropped] = onError.mock.calls[0];
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toMatch(/HTTP 500/);
+    expect(dropped).toEqual([entry]);
+
+    warnSpy.mockRestore();
+    await t.destroy();
+  });
+
+  it('does not fire onError while retries are still pending', async () => {
+    const warnSpy   = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const failFetch = makeFetch(false, 500);
+    const onError   = vi.fn();
+
+    const t = new HttpTransport({
+      name: 'retries-remaining',
+      url: 'http://localhost/logs',
+      batchSize: 1,
+      retryAttempts: 3,
+      fetchImpl: failFetch,
+      onError,
+    });
+
+    t.write(makeEntry());
+    await Promise.resolve();
+    // First attempt failed; retries are scheduled via setTimeout — onError must
+    // remain silent until they too are exhausted.
+    expect(onError).not.toHaveBeenCalled();
+
+    warnSpy.mockRestore();
+    await t.destroy();
+  });
+
+  it('drops oldest queued batch when maxQueueSize is exceeded (default strategy)', async () => {
+    // Make fetch hang so isProcessing stays true and pushes pile up in retryQueue.
+    let resolveFirst!: () => void;
+    const hangingFetch = vi.fn().mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFirst = () => resolve({ ok: true, status: 200 } as Response);
+        }),
+    ).mockResolvedValue({ ok: true, status: 200 } as Response);
+
+    const onError = vi.fn();
+    const t = new HttpTransport({
+      name: 'queue-overflow',
+      url: 'http://localhost/logs',
+      batchSize: 1,
+      flushInterval: 999999,
+      maxQueueSize: 1, // queue holds 1 batch besides the in-flight one
+      retryAttempts: 0,
+      fetchImpl: hangingFetch,
+      onError,
+    });
+
+    t.write(makeEntry({ msg: 'in-flight' })); // becomes the in-flight batch
+    await Promise.resolve();
+
+    // Two more writes — second one evicts the first from the queue
+    t.write(makeEntry({ msg: 'queued-1' }));
+    await Promise.resolve();
+    t.write(makeEntry({ msg: 'queued-2' }));
+    await Promise.resolve();
+
+    expect(onError).toHaveBeenCalledOnce();
+    const [err, dropped] = onError.mock.calls[0];
+    expect((err as Error).message).toMatch(/queue overflow.*drop-oldest/);
+    expect(dropped[0].msg).toBe('queued-1');
+
+    resolveFirst();
+    await t.destroy();
+  });
+
+  it('drops the new batch when overflowStrategy is drop-newest', async () => {
+    let resolveFirst!: () => void;
+    const hangingFetch = vi.fn().mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFirst = () => resolve({ ok: true, status: 200 } as Response);
+        }),
+    ).mockResolvedValue({ ok: true, status: 200 } as Response);
+
+    const onError = vi.fn();
+    const t = new HttpTransport({
+      name: 'queue-overflow-newest',
+      url: 'http://localhost/logs',
+      batchSize: 1,
+      flushInterval: 999999,
+      maxQueueSize: 1,
+      overflowStrategy: 'drop-newest',
+      retryAttempts: 0,
+      fetchImpl: hangingFetch,
+      onError,
+    });
+
+    t.write(makeEntry({ msg: 'in-flight' }));
+    await Promise.resolve();
+    t.write(makeEntry({ msg: 'queued-1' }));
+    await Promise.resolve();
+    t.write(makeEntry({ msg: 'queued-2' })); // dropped
+    await Promise.resolve();
+
+    expect(onError).toHaveBeenCalledOnce();
+    const [err, dropped] = onError.mock.calls[0];
+    expect((err as Error).message).toMatch(/queue overflow.*drop-newest/);
+    expect(dropped[0].msg).toBe('queued-2');
+
+    resolveFirst();
+    await t.destroy();
+  });
+
+  it('swallows exceptions thrown from onError callback', async () => {
+    const warnSpy   = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const failFetch = makeFetch(false, 500);
+
+    const t = new HttpTransport({
+      name: 'onerror-throws',
+      url: 'http://localhost/logs',
+      batchSize: 1,
+      retryAttempts: 0,
+      fetchImpl: failFetch,
+      onError: () => { throw new Error('user code blew up'); },
+    });
+
+    expect(() => t.write(makeEntry())).not.toThrow();
+    // Allow the async send + onError invocation to settle
+    await Promise.resolve();
+    await Promise.resolve();
+
+    warnSpy.mockRestore();
+    await t.destroy();
+  });
+
   it('sends custom headers', async () => {
     const t = new HttpTransport({
       name: 'header-test',

@@ -140,14 +140,14 @@ Goal: universal logging library (Browser + Node.js) competitive with Pino.js, wi
   - [x] Glob/wildcard matching: `DEBUG=konsole:http,konsole:db` or `DEBUG=*`
   - [x] Negation support: `DEBUG=*,-App:verbose` disables specific namespaces
 
-- [ ] **Transport error observability**
-  - [ ] `HttpTransport` `onError(err, droppedEntries)` callback option — currently silent on failure after retries
-  - [ ] `maxQueueSize` option on `HttpTransport` — retry queue is currently unbounded; cap with `'drop-oldest'` / `'drop-newest'` overflow strategy
-  - [ ] `StreamTransport`: check `stream.write()` return value and handle backpressure — currently ignored, can lose logs under high throughput
+- [x] **Transport error observability**
+  - [x] `HttpTransport` `onError(err, droppedEntries)` callback option — fired when a batch is permanently dropped (retries exhausted or evicted by `maxQueueSize`)
+  - [x] `maxQueueSize` option on `HttpTransport` — cap pending-batch queue with `'drop-oldest'` / `'drop-newest'` overflow strategy
+  - [x] `StreamTransport`: respects `stream.write()` return value — pauses, queues, and flushes on `'drain'`; `maxQueueSize` + `onDrop` for bounded buffering. `FileTransport` inherits the same path across rotations.
 
-- [ ] **Input validation**
-  - [ ] `setLevel()` should throw (or warn) on invalid level strings — currently silent undefined behavior
-  - [ ] Guard `child()` against non-serializable bindings (circular refs will throw in worker `postMessage`)
+- [x] **Input validation**
+  - [x] `setLevel()` throws `TypeError` on invalid level strings (level setter delegates)
+  - [x] `child()` guards bindings via `structuredClone` probe when `useWorker: true` — clear error at call-site instead of cryptic worker crash
 
 - [x] **Pino API compatibility (Phase 1 — quick wins)**
   - [x] `logger.level` getter/setter property (currently only `setLevel()` method)

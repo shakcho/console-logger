@@ -146,6 +146,28 @@ export interface TransportConfig {
   flushInterval?: number;
   /** Retry attempts on failure with exponential backoff (default: 3) */
   retryAttempts?: number;
+  /**
+   * Cap the number of pending batches awaiting send. When the queue reaches
+   * this size, batches are dropped per `overflowStrategy`.
+   * @default Infinity (unbounded)
+   */
+  maxQueueSize?: number;
+  /**
+   * What to drop when `maxQueueSize` is reached.
+   * - `'drop-oldest'` — discard the oldest queued batch (default; favours fresh data)
+   * - `'drop-newest'` — discard the incoming batch (favours older data)
+   * @default 'drop-oldest'
+   */
+  overflowStrategy?: 'drop-oldest' | 'drop-newest';
+  /**
+   * Called when a batch is permanently dropped — either after retry attempts
+   * are exhausted, or when evicted by `maxQueueSize`. Use this to surface
+   * delivery failures (alerting, dead-letter logging, metrics).
+   *
+   * Receives the underlying error (HTTP failure, queue-overflow sentinel) and
+   * the dropped log entries.
+   */
+  onError?: (err: Error, droppedEntries: LogEntry[]) => void;
   /** Only send entries that pass this predicate */
   filter?: (entry: LogEntry) => boolean;
   /** Transform an entry before sending */

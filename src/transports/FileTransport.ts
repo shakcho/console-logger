@@ -1,5 +1,5 @@
 import { isNode } from '../env';
-import { toLine, type FileFormat } from './base';
+import { type FileFormat } from './base';
 import { StreamTransport, type StreamTransportOptions, type WritableLike } from './StreamTransport';
 import type { LogEntry } from '../types';
 
@@ -35,6 +35,12 @@ export interface FileTransportOptions {
   filter?: (entry: LogEntry) => boolean;
   /** File rotation configuration. Omit to disable rotation. */
   rotation?: RotationOptions;
+  /** Cap entries buffered while the stream is paused under backpressure (default: Infinity). */
+  maxQueueSize?: number;
+  /** Drop strategy when `maxQueueSize` is reached (default: `'drop-oldest'`). */
+  overflowStrategy?: 'drop-oldest' | 'drop-newest';
+  /** Called when entries are dropped due to backpressure-queue overflow. */
+  onDrop?: (entries: LogEntry[], reason: string) => void;
 }
 
 /**
@@ -85,10 +91,13 @@ export class FileTransport extends StreamTransport {
     }
 
     super({
-      stream: createPlaceholder(),
-      name:   options.name   ?? `file:${options.path}`,
-      format: options.format ?? 'json',
-      filter: options.filter,
+      stream:           createPlaceholder(),
+      name:             options.name   ?? `file:${options.path}`,
+      format:           options.format ?? 'json',
+      filter:           options.filter,
+      maxQueueSize:     options.maxQueueSize,
+      overflowStrategy: options.overflowStrategy,
+      onDrop:           options.onDrop,
     } satisfies StreamTransportOptions);
 
     this.filePath     = options.path;
@@ -104,13 +113,16 @@ export class FileTransport extends StreamTransport {
       this.pendingEntries.push(entry);
       return;
     }
-    const line = toLine(entry, this.format) + '\n';
-    try {
-      this.stream.write(line);
-      this.bytesWritten += Buffer.byteLength(line, 'utf8');
-    } catch (err) {
-      console.error(`[Konsole FileTransport: ${this.name}] Write error:`, err);
+    if (this.paused) {
+      this.enqueuePending(entry);
+      return;
     }
+    this.doStreamWrite(entry);
+  }
+
+  /** Track byte count + trigger size-based rotation after every successful write. */
+  protected override afterWrite(_entry: LogEntry, line: string, _ok: boolean): void {
+    this.bytesWritten += Buffer.byteLength(line, 'utf8');
     if (
       this.rotationOpts?.maxSize &&
       !this.rotating &&
@@ -175,13 +187,17 @@ export class FileTransport extends StreamTransport {
     this.rotating = false;
     this.bytesWritten = 0;
 
-    // Flush entries that arrived during rotation
-    for (const entry of this.pendingEntries) {
-      const line = toLine(entry, this.format) + '\n';
-      this.stream.write(line);
-      this.bytesWritten += Buffer.byteLength(line, 'utf8');
-    }
+    // Flush entries that arrived during rotation. Route through the
+    // backpressure-aware path so a slow new stream doesn't drop logs.
+    const queued = this.pendingEntries;
     this.pendingEntries = [];
+    for (const entry of queued) {
+      if (this.paused) {
+        this.enqueuePending(entry);
+      } else {
+        this.doStreamWrite(entry);
+      }
+    }
 
     // Reschedule timer-based rotation
     this.scheduleTimerRotation();
@@ -237,12 +253,12 @@ export class FileTransport extends StreamTransport {
 
     const fileStream = createWriteStream(this.filePath, { flags }) as unknown as WritableLike;
 
-    fileStream.on('error', (err) => {
-      console.error(`[Konsole FileTransport: ${this.name}] File error: ${err.message}`);
-    });
-
     this.stream  = fileStream;
+    this.paused  = false; // fresh stream — discard any stale paused state from prior rotation
     this.isReady = true;
+    // Attach base error + drain listeners to the new stream so backpressure works
+    // across rotations.
+    this.attachStreamListeners(fileStream);
 
     // Seed bytesWritten from existing file size when appending
     if (flags === 'a' && this.rotationOpts) {
@@ -259,11 +275,17 @@ export class FileTransport extends StreamTransport {
       }
     }
 
-    // Flush entries that arrived before the stream was ready
-    for (const entry of this.pendingEntries) {
-      this.stream.write(toLine(entry, this.format) + '\n');
-    }
+    // Flush entries that arrived before the stream was ready. Use the
+    // backpressure-aware write path so byte counts + drain are honoured.
+    const queued = this.pendingEntries;
     this.pendingEntries = [];
+    for (const entry of queued) {
+      if (this.paused) {
+        this.enqueuePending(entry);
+      } else {
+        this.doStreamWrite(entry);
+      }
+    }
 
     // Schedule time-based rotation
     this.scheduleTimerRotation();

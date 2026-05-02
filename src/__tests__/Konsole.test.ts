@@ -330,6 +330,36 @@ describe('Konsole', () => {
       // getLogs on parent should include both entries
       expect(parent.getLogs()).toHaveLength(2);
     });
+
+    describe('non-serializable bindings guard (useWorker)', () => {
+      // Toggle useWorker post-construction to exercise the guard without
+      // actually spawning a real worker thread (which would leak between tests).
+      function enableWorker(logger: Konsole): void {
+        (logger as unknown as { useWorker: boolean }).useWorker = true;
+      }
+
+      it('throws TypeError when bindings contain a function and useWorker is true', () => {
+        const parent = makeSilentLogger({ namespace: 'GuardFn' });
+        enableWorker(parent);
+        expect(() => parent.child({ render: () => 'x' })).toThrow(TypeError);
+        expect(() => parent.child({ render: () => 'x' })).toThrow(/structured-cloneable/);
+      });
+
+      it('allows circular references — structuredClone handles them natively', () => {
+        const parent = makeSilentLogger({ namespace: 'GuardCircular' });
+        enableWorker(parent);
+        const circular: Record<string, unknown> = { name: 'a' };
+        circular.self = circular;
+        expect(() => parent.child(circular)).not.toThrow();
+      });
+
+      it('does not validate bindings when useWorker is false', () => {
+        const parent = makeSilentLogger({ namespace: 'NoGuard' });
+        // A function in bindings is dodgy but tolerated when there's no worker —
+        // transports that JSON.stringify silently drop it.
+        expect(() => parent.child({ fn: () => 'x' })).not.toThrow();
+      });
+    });
   });
 
   describe('enableGlobalPrint', () => {
@@ -625,6 +655,25 @@ describe('Konsole', () => {
       const logger = makeSilentLogger({ level: 'info' });
       logger.setLevel('fatal');
       expect(logger.level).toBe('fatal');
+    });
+
+    it('setLevel throws TypeError on an invalid level', () => {
+      const logger = makeSilentLogger({ level: 'info' });
+      // @ts-expect-error — deliberately passing a bad value
+      expect(() => logger.setLevel('verbose')).toThrow(TypeError);
+      // @ts-expect-error — deliberately passing a bad value
+      expect(() => logger.setLevel('verbose')).toThrow(/Invalid log level/);
+      // Logger state should be unchanged after the rejected call
+      expect(logger.level).toBe('info');
+    });
+
+    it('level setter throws on an invalid level', () => {
+      const logger = makeSilentLogger({ level: 'info' });
+      expect(() => {
+        // @ts-expect-error — deliberately passing a bad value
+        logger.level = 'loud';
+      }).toThrow(TypeError);
+      expect(logger.level).toBe('info');
     });
   });
 
