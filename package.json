@@ -75,6 +75,8 @@
     "pino-alternative",
     "winston",
     "bunyan",
+    "consola",
+    "consola-alternative",
     "loglevel"
   ],
   "author": "Sakti Kumar Chourasia",

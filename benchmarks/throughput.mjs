@@ -13,9 +13,12 @@
 
 import { performance } from 'node:perf_hooks';
 import { createWriteStream } from 'node:fs';
-import { unlink } from 'node:fs/promises';
+import { writeFile, unlink } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -73,15 +76,23 @@ async function runBench(name, logFn, opts = {}) {
   // Sort for percentiles
   const sorted = Array.from(latencies).sort((a, b) => a - b);
 
+  const p50ns = percentile(sorted, 0.5);
+  const p95ns = percentile(sorted, 0.95);
+  const p99ns = percentile(sorted, 0.99);
+
   return {
     name,
     iterations,
+    elapsedRaw: elapsed,
     elapsed: `${elapsed.toFixed(0)} ms`,
     opsPerSec: formatOps(opsPerSec),
     opsPerSecRaw: opsPerSec,
-    p50: formatNs(percentile(sorted, 0.5)),
-    p95: formatNs(percentile(sorted, 0.95)),
-    p99: formatNs(percentile(sorted, 0.99)),
+    p50ns,
+    p95ns,
+    p99ns,
+    p50: formatNs(p50ns),
+    p95: formatNs(p95ns),
+    p99: formatNs(p99ns),
   };
 }
 
@@ -217,6 +228,37 @@ async function main() {
     console.log('  ⚠ Winston not installed — skipping (npm install --no-save winston)');
   }
 
+  // ── Consola ──────────────────────────────────────────────────────────────
+
+  const consola = await tryImport('consola');
+  if (consola?.createConsola) {
+    // Silent (level -999 drops everything before reporters run)
+    {
+      const logger = consola.createConsola({ level: -999 });
+      results.push(await runBench('Consola (silent)', (i) => logger.info('Hello world', { i, ...FIELDS })));
+    }
+
+    // JSON → /dev/null via custom reporter
+    {
+      const devnull = devNull();
+      const jsonReporter = {
+        log(obj) { devnull.write(JSON.stringify(obj) + '\n'); },
+      };
+      const logger = consola.createConsola({ level: 5, reporters: [jsonReporter] });
+      results.push(await runBench('Consola (JSON → /dev/null)', (i) => logger.info('Hello world', { i, ...FIELDS })));
+      devnull.end();
+    }
+
+    // Tagged child (consola's equivalent of bindings)
+    {
+      const logger = consola.createConsola({ level: -999 });
+      const child = logger.withTag('child').withDefaults({ requestId: 'req_xyz', userId: 99 });
+      results.push(await runBench('Consola (tagged child, silent)', (i) => child.info('Hello world', { i, path: '/users' })));
+    }
+  } else {
+    console.log('  ⚠ Consola not installed — skipping (npm install --no-save consola)');
+  }
+
   // ── Bunyan ───────────────────────────────────────────────────────────────
 
   const bunyan = await tryImport('bunyan');
@@ -264,6 +306,7 @@ async function main() {
   if (pino) sizes.push({ Logger: 'Pino', 'ESM (min)': 'N/A (CJS)', 'Gzip': '~32 KB', 'Dependencies': '5+', 'Note': 'sonic-boom, fast-redact, etc.' });
   if (winston) sizes.push({ Logger: 'Winston', 'ESM (min)': 'N/A (CJS)', 'Gzip': '~70 KB', 'Dependencies': '10+', 'Note': 'logform, triple-beam, etc.' });
   if (bunyan) sizes.push({ Logger: 'Bunyan', 'ESM (min)': 'N/A (CJS)', 'Gzip': '~45 KB', 'Dependencies': '3+', 'Note': 'dtrace-provider optional' });
+  if (consola) sizes.push({ Logger: 'Consola', 'ESM (min)': 'ESM', 'Gzip': '~12 KB', 'Dependencies': '7+', 'Note': 'UnJS family, browser+Node' });
 
   sizes.push({ Logger: 'console.log', 'ESM (min)': '0 KB', 'Gzip': '0 KB', 'Dependencies': '0', 'Note': 'No structure, no levels, no transports' });
 
@@ -312,6 +355,39 @@ async function main() {
 
   await memLogger.destroy();
   await memLogger2.destroy();
+
+  // ── Write structured JSON for CI regression tracking ─────────────────────
+
+  const jsonOut = {
+    schemaVersion: 1,
+    createdAt:     new Date().toISOString(),
+    platform: {
+      os:   os.platform(),
+      arch: os.arch(),
+      node: process.version,
+      cpu:  os.cpus()[0]?.model ?? 'unknown',
+    },
+    iterations: ITERATIONS,
+    throughput: results.map((r) => ({
+      name:       r.name,
+      opsPerSec:  r.opsPerSecRaw,
+      p50ns:      r.p50ns,
+      p95ns:      r.p95ns,
+      p99ns:      r.p99ns,
+      elapsedMs:  r.elapsedRaw,
+    })),
+    memory: {
+      uncappedDeltaBytes: memDelta,
+      perEntryBytes:      memDelta / 100_000,
+      cappedDeltaBytes:   memCappedDelta,
+    },
+  };
+
+  const outPath = process.env.KONSOLE_BENCH_JSON
+    ?? path.join(__dirname, '..', 'benchmark-throughput.json');
+  await writeFile(outPath, JSON.stringify(jsonOut, null, 2) + '\n');
+  console.log(`  → JSON results written to ${outPath}`);
+  console.log('');
 
   console.log('Done.');
 }

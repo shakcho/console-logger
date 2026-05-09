@@ -12,7 +12,7 @@ npm run build
 npm run benchmark
 
 # With competitors — install them first:
-npm install --no-save pino winston bunyan
+npm install --no-save pino winston bunyan consola
 npm run benchmark
 
 # Bundle size analysis

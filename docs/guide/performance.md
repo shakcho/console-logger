@@ -1,6 +1,6 @@
 ---
 title: Performance
-description: Console Logger benchmarks against Pino, Winston, and Bunyan. ~10 KB gzipped, zero dependencies, ~8M ops/sec disabled, ~650K ops/sec NDJSON output.
+description: Console Logger benchmarks against Pino, Winston, Bunyan, and Consola. ~10 KB gzipped, zero dependencies, 4.16M ops/sec emitting structured JSON.
 ---
 
 # Performance
@@ -9,38 +9,62 @@ Console is built for production. It adds minimal overhead to your application wh
 
 ## Benchmarks
 
-Measured on Apple M2 Max, Node.js v23.11.0, 100K iterations per benchmark.
+Measured on Apple M5 Max, Node.js v24.15, 100K iterations per benchmark.
 
-### Throughput (ops/sec)
+### What matters in production: structured JSON throughput
 
-| Scenario | Console | Pino | Winston | Bunyan |
+For most apps the only number that matters is "how fast can the logger actually emit a structured log line." This is the path your code runs in production — not silent / disabled.
+
+| Logger | ops/sec | p50 | p95 | p99 |
 |---|---:|---:|---:|---:|
-| Silent / disabled | ~8M | ~7M | ~1.5M | — |
-| JSON → /dev/null | ~650K | ~470K | ~270K | ~340K |
-| Child (disabled) | ~17M | ~14M | ~2M | — |
-| Silent (browser, with buffer) | ~4.7M | — | — | — |
-| With Worker (browser/Node.js) | non-blocking | — | — | — |
+| **Console** (JSON → /dev/null) | **4.16M** | **125 ns** | **167 ns** | **958 ns** |
+| Consola (JSON → /dev/null) | 795.9K | 1.13 µs | 1.37 µs | 2.17 µs |
+| Bunyan (child → /dev/null) | 752.0K | 1.08 µs | 1.38 µs | 2.25 µs |
+| Bunyan (JSON → /dev/null) | 741.8K | 1.25 µs | 1.46 µs | 2.33 µs |
+| Winston (JSON → /dev/null) | 672.9K | 917 ns | 1.75 µs | 2.17 µs |
+| Pino (JSON → /dev/null) | 560.5K | 1.63 µs | 2.67 µs | 3.38 µs |
 
-> Pino, Winston, and Bunyan are Node.js only. Console is the only structured logger that runs natively in the browser and Node.js with worker offloading.
+Console emits structured JSON **~5× faster than Consola, Bunyan, and Winston, and ~7× faster than Pino**. p50 latency is roughly an order of magnitude lower than every competitor.
 
-### Latency (p50)
+> Pino, Winston, and Bunyan are Node.js only. Consola runs in the browser but without worker offloading. Console is the only structured logger that runs natively in both with worker offloading.
 
-| Scenario | Console | Pino | Winston | Bunyan |
-|---|---:|---:|---:|---:|
-| Silent | 83 ns | 83 ns | 292 ns | — |
-| JSON → stream | 1.13 µs | 1.50 µs | 1.54 µs | 2.08 µs |
-| Child (disabled) | 41 ns | 41 ns | 292 ns | — |
+### Microbenchmark: disabled / silent overhead
 
-### Bundle & Install Size
+This measures how cheap a *filtered-out* log call is — i.e. what your code pays for `logger.debug(…)` in production when the level is set above `debug`. **It is not a realistic throughput number** because nobody runs a fully silenced logger; it's just an upper bound on per-call overhead.
 
-| | Console | Pino | Winston | Bunyan |
-|---|---:|---:|---:|---:|
-| Bundle (gzip) | ~10 KB | ~32 KB | ~70 KB | ~45 KB |
-| Install size | 86 KB | 1.17 MB | 360 KB | 212 KB |
-| Dependencies | 0 | 11 | 11 | 0 |
+| Logger | Mode | ops/sec |
+|---|---|---:|
+| Pino | child, disabled | 34.02M |
+| **Console** | child, no buffer | 32.86M |
+| Consola | tagged child, silent | 22.60M |
+| Consola | silent | 15.24M |
+| Pino | disabled | 13.57M |
+| **Console** | silent, no buffer | 13.45M |
+| Winston | silent | 2.98M |
+| Winston | child, silent | 2.12M |
+
+Console, Pino, and Consola sit in the same fast-path tier (within run-to-run V8 noise). Winston is a tier below. Where Console pulls clearly ahead is the production scenario above — JSON output to a stream — not these microbenchmarks.
+
+### Browser / worker scenarios
+
+| Scenario | Console |
+|---|---:|
+| Silent + circular buffer (browser default) | 6.01M ops/sec |
+| Child + circular buffer (browser default) | 3.88M ops/sec |
+| With Worker transport | non-blocking on the main thread |
+
+Pino, Winston, Bunyan, and Consola don't have an equivalent — none offer worker-thread offloading, and Pino/Winston/Bunyan don't run in the browser at all.
+
+### Bundle & install size
+
+| | Console | Pino | Winston | Bunyan | Consola |
+|---|---:|---:|---:|---:|---:|
+| Bundle (gzip) | **~10 KB** | ~32 KB | ~70 KB | ~45 KB | ~12 KB |
+| Install size | **135 KB** | 1.17 MB | 360 KB | 212 KB | 420 KB |
+| Dependencies | **0** | 11 | 11 | 0 | 0 |
 
 ::: info Reproducing benchmarks
-Microbenchmark numbers at the nanosecond level vary between runs due to V8 JIT state, GC, and OS scheduling. Run `npm run benchmark` to see numbers on your hardware. Install competitors first with `npm install --no-save pino winston bunyan`.
+Microbenchmark numbers at the nanosecond level vary between runs due to V8 JIT state, GC, and OS scheduling. Run `npm run benchmark` to see numbers on your hardware. Install competitors first with `npm install --no-save pino winston bunyan consola`.
 :::
 
 ## Buffer Mode
@@ -171,7 +195,7 @@ useEffect(() => {
 ```bash
 npm run build
 npm run benchmark                          # Console only
-npm install --no-save pino winston bunyan  # install competitors
+npm install --no-save pino winston bunyan consola  # install competitors
 npm run benchmark                          # full comparison
 npm run benchmark:size                     # bundle size analysis
 npm run benchmark:gc                       # with GC stats

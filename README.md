@@ -18,18 +18,18 @@
 
 ## Why Console?
 
-| Feature | Console | Pino | Winston | Bunyan |
-|---------|:-------:|:----:|:-------:|:------:|
-| Browser support | **Native** | No | No | No |
-| Worker offloading | **Yes** | No | No | No |
-| Bundle (gzip) | **~10 KB** | ~32 KB | ~70 KB | ~45 KB |
-| Dependencies | **0** | 11 | 11 | 0 |
-| Child loggers | Yes | Yes | Yes | Yes |
-| File rotation + gzip | **Built-in** | Separate | Separate | No |
-| Field redaction | **Built-in** | Plugin | No | No |
-| Configurable timestamps | **7 presets + custom** | Epoch only | Basic | Basic |
-| DevTools styling | **CSS badges** | No | No | No |
-| TypeScript-first | **Yes** | Partial | Partial | No |
+| Feature | Console | Pino | Winston | Bunyan | Consola |
+|---------|:-------:|:----:|:-------:|:------:|:-------:|
+| Browser support | **Native** | No | No | No | Yes |
+| Worker offloading | **Yes** | No | No | No | No |
+| Bundle (gzip) | **~10 KB** | ~32 KB | ~70 KB | ~45 KB | ~12 KB |
+| Dependencies | **0** | 11 | 11 | 0 | 0 |
+| Child loggers | Yes | Yes | Yes | Yes | Yes (`withTag`) |
+| File rotation + gzip | **Built-in** | Separate | Separate | No | No |
+| Field redaction | **Built-in** | Plugin | No | No | No |
+| Configurable timestamps | **7 presets + custom** | Epoch only | Basic | Basic | Basic |
+| DevTools styling | **CSS badges** | No | No | No | No |
+| TypeScript-first | **Yes** | Partial | Partial | No | Yes |
 
 ## Features
 
@@ -540,24 +540,52 @@ __Konsole.getLogger('Auth').setTimestamp('time') // per-logger override
 
 ## Performance
 
-Console is designed to have minimal overhead. Unlike Pino, Winston, and Bunyan (Node.js only), Console works natively in the browser and Node.js with worker offloading for non-blocking transport processing.
+Console is designed for minimal overhead. Unlike Pino, Winston, and Bunyan (Node.js only), Console works natively in the browser and Node.js with worker-thread offloading for non-blocking transport processing.
 
-Benchmarked on Apple M2 Max, Node.js v23 (100K iterations):
+Benchmarked on Apple M5 Max, Node.js v24.15 (100K iterations).
 
-| Scenario | Console | Pino | Winston | Bunyan |
+### What matters in production: structured JSON throughput
+
+For most apps the only number that matters is "how fast can the logger actually emit a structured log line." Silent / disabled benchmarks (further down) measure call-site overhead, but you don't ship loggers silenced — you ship them writing JSON to stdout, a file, or a stream.
+
+| Logger | ops/sec | p50 | p95 | p99 |
 |---|---:|---:|---:|---:|
-| Disabled / silent | ~8M | ~7M | ~1.5M | — |
-| JSON → /dev/null | ~650K | ~470K | ~270K | ~340K |
-| Child (disabled) | ~17M | ~14M | ~2M | — |
+| **Console** (JSON → /dev/null) | **4.16M** | **125 ns** | **167 ns** | **958 ns** |
+| Consola (JSON → /dev/null) | 795.9K | 1.13 µs | 1.37 µs | 2.17 µs |
+| Bunyan (child → /dev/null) | 752.0K | 1.08 µs | 1.38 µs | 2.25 µs |
+| Bunyan (JSON → /dev/null) | 741.8K | 1.25 µs | 1.46 µs | 2.33 µs |
+| Winston (JSON → /dev/null) | 672.9K | 917 ns | 1.75 µs | 2.17 µs |
+| Pino (JSON → /dev/null) | 560.5K | 1.63 µs | 2.67 µs | 3.38 µs |
 
-| | Console | Pino | Winston | Bunyan |
-|---|---:|---:|---:|---:|
-| **Bundle (gzip)** | **~10 KB** | ~32 KB | ~70 KB | ~45 KB |
-| **Install size** | **86 KB** | 1.17 MB | 360 KB | 212 KB |
-| **Dependencies** | **0** | 11 | 11 | 0 |
-| **Browser support** | **Native + Worker** | No | No | No |
+Console emits structured JSON **~5× faster than Consola, Bunyan, and Winston, and ~7× faster than Pino**. p50 latency is roughly an order of magnitude lower than every competitor.
 
-> Run `npm run benchmark` to reproduce on your hardware. Install competitors with `npm install --no-save pino winston bunyan`.
+### Microbenchmark: disabled / silent overhead
+
+This measures how cheap a *filtered-out* log call is — i.e. what your code pays for `logger.debug(…)` in production when the level is set above `debug`.
+
+| Logger | Mode | ops/sec |
+|---|---|---:|
+| Pino | child, disabled | 34.02M |
+| **Console** | child, no buffer | 32.86M |
+| Consola | tagged child, silent | 22.60M |
+| Consola | silent | 15.24M |
+| Pino | disabled | 13.57M |
+| **Console** | silent, no buffer | 13.45M |
+| Winston | silent | 2.98M |
+| Winston | child, silent | 2.12M |
+
+Console, Pino, and Consola sit in the same fast-path tier (within run-to-run V8 noise). Winston is a tier below.
+
+### Bundle / install size
+
+| | Console | Pino | Winston | Bunyan | Consola |
+|---|---:|---:|---:|---:|---:|
+| **Bundle (gzip)** | **~10 KB** | ~32 KB | ~70 KB | ~45 KB | ~12 KB |
+| **Install size** | **135 KB** | 1.17 MB | 360 KB | 212 KB | 420 KB |
+| **Dependencies** | **0** | 11 | 11 | 0 | 0 |
+| **Browser support** | **Native + Worker** | No | No | No | Native |
+
+> Run `npm run benchmark` to reproduce on your hardware. Install competitors with `npm install --no-save pino winston bunyan consola`.
 
 ### Worker Performance
 

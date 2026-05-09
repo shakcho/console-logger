@@ -7,7 +7,7 @@
  *   node benchmarks/size.mjs
  */
 
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -77,10 +77,10 @@ async function main() {
 
   console.log('─── Install Size Comparison ──────────────────────────');
   console.log('  (install sizes from node_modules — install competitors with:');
-  console.log('   npm install --no-save pino winston bunyan)');
+  console.log('   npm install --no-save pino winston bunyan consola)');
   console.log('');
 
-  const competitors = ['pino', 'winston', 'bunyan'];
+  const competitors = ['pino', 'winston', 'bunyan', 'consola'];
   const rows = [];
 
   for (const pkg of competitors) {
@@ -143,6 +143,25 @@ async function main() {
   }
   console.log(`  ${'─'.repeat(42)} ─────────`);
   console.log(`  ${'Total source'.padEnd(42)} ${formatBytes(totalSrc)}`);
+  console.log('');
+
+  // ── Write structured JSON for CI regression tracking ─────────────────────
+
+  const jsonOut = {
+    schemaVersion: 1,
+    createdAt:     new Date().toISOString(),
+    bundle: {
+      esm:   esm ? { rawBytes: esm.raw, gzipBytes: esm.gzipped } : null,
+      umd:   umd ? { rawBytes: umd.raw, gzipBytes: umd.gzipped } : null,
+      types: dts ? { rawBytes: dts.raw, gzipBytes: dts.gzipped } : null,
+    },
+    sourceTotalBytes: totalSrc,
+  };
+
+  const outPath = process.env.KONSOLE_SIZE_JSON
+    ?? path.join(root, 'benchmark-size.json');
+  await writeFile(outPath, JSON.stringify(jsonOut, null, 2) + '\n');
+  console.log(`  → JSON results written to ${outPath}`);
   console.log('');
 }
 
