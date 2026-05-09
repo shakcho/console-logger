@@ -1,6 +1,6 @@
 ---
 title: What is Console Logger?
-description: Console Logger is a structured, namespaced JavaScript and TypeScript logger that works in both browser and Node.js. Learn what it does and why developers choose it over plain console.log, Pino, Winston, or Bunyan.
+description: Console Logger is a structured, namespaced JavaScript and TypeScript logger that works in both browser and Node.js. Learn what it does and why developers choose it over plain console.log, Pino, Winston, Bunyan, or Consola.
 ---
 
 # What is Console Logger?
@@ -50,7 +50,7 @@ Console solves all of these while remaining lightweight and dependency-free.
 | Type safety | ❌ | ✅ |
 | Zero dependencies | ✅ | ✅ |
 | Browser + Node.js | ✅ (basic) | ✅ (structured, with DevTools tooling) |
-| Bundle (gzip) | 0 KB | ~10 KB (vs Pino ~32 KB, Winston ~70 KB) |
+| Bundle (gzip) | 0 KB | ~10 KB (vs Pino ~32 KB, Winston ~70 KB, Bunyan ~45 KB, Consola ~12 KB) |
 
 ## Philosophy
 

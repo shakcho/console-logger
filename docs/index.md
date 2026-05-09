@@ -105,27 +105,43 @@ import { FEATURE_SNIPPETS, USAGE_SNIPPETS } from './.vitepress/theme/components/
 
 ## Benchmarks
 
-Measured on Apple M2 Max, Node.js v23, 100K iterations. Pino, Winston, and Bunyan are
-Node.js only — Console works in both browser and Node.js. Run `npm run benchmark`
-to reproduce.
+Measured on Apple M5 Max, Node.js v24.15, 100K iterations. Pino, Winston, and Bunyan
+are Node.js only; Consola runs in the browser but without worker offloading. Console
+runs in both with worker offloading. Run `npm run benchmark` to reproduce.
 
-**Throughput** (ops/sec, higher is better)
+**Production throughput** — emitting structured JSON to a stream (the path that runs in real apps; higher is better)
 
-| Scenario             | Console        | Pino     | Winston  | Bunyan  |
-| -------------------- | -------------- | -------- | -------- | ------- |
-| Silent / disabled    | **~8M**        | ~7M      | ~1.5M    | —       |
-| JSON → /dev/null     | **~650K**      | ~470K    | ~270K    | ~340K   |
-| Child (disabled)     | **~17M**       | ~14M     | ~2M      | —       |
-| Browser + buffer     | **~4.7M**      | —        | —        | —       |
-| With Worker          | **non-blocking** | —      | —        | —       |
+| Logger                  | ops/sec        | p50      |
+| ----------------------- | -------------- | -------- |
+| **Console**             | **4.16M**      | **125 ns** |
+| Consola                 | 795.9K         | 1.13 µs  |
+| Bunyan                  | 741.8K         | 1.25 µs  |
+| Winston                 | 672.9K         | 917 ns   |
+| Pino                    | 560.5K         | 1.63 µs  |
+
+**Disabled / silent** — microbenchmark for per-call overhead (not a realistic throughput; nobody ships silenced loggers)
+
+| Mode                          | Console    | Pino     | Consola  | Winston  |
+| ----------------------------- | ---------- | -------- | -------- | -------- |
+| Silent / disabled             | 13.45M     | 13.57M   | 15.24M   | 2.98M    |
+| Child (silent / disabled)     | 32.86M     | 34.02M   | 22.60M   | 2.12M    |
+
+Console, Pino, and Consola are within run-to-run V8 noise on the silent path — the gap shows up where it matters: actually emitting log lines.
+
+**Browser-only**
+
+| Scenario             | Console        |
+| -------------------- | -------------- |
+| Silent + buffer      | **6.01M**      |
+| With Worker          | **non-blocking** |
 
 **Bundle & install size** (smaller is better)
 
-|              | Console     | Pino     | Winston | Bunyan  |
-| ------------ | ----------- | -------- | ------- | ------- |
-| Bundle (gzip)| **~10 KB**  | ~32 KB   | ~70 KB  | ~45 KB  |
-| Install size | **86 KB**   | 1.17 MB  | 360 KB  | 212 KB  |
-| Dependencies | **0**       | 11       | 11      | 0       |
+|              | Console     | Pino     | Winston | Bunyan  | Consola |
+| ------------ | ----------- | -------- | ------- | ------- | ------- |
+| Bundle (gzip)| **~10 KB**  | ~32 KB   | ~70 KB  | ~45 KB  | ~12 KB  |
+| Install size | **135 KB**  | 1.17 MB  | 360 KB  | 212 KB  | 420 KB  |
+| Dependencies | **0**       | 11       | 11      | 0       | 0       |
 
 See the [Performance Guide](/guide/performance) for details.
 
