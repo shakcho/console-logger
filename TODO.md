@@ -71,7 +71,7 @@ Goal: universal logging library (Browser + Node.js) competitive with Pino.js, wi
   - [x] Unit tests: `ConsoleTransport`, `StreamTransport`, `FileTransport`
   - [x] Unit tests: all formatters (Pretty, JSON, Text, Silent)
   - [x] Unit tests: timestamp configuration, `formatTimestamp`, `resolveTimestampConfig`, `setTimestamp`, high-resolution timestamps
-  - [ ] Integration tests: Browser environment (happy-dom) — deferred
+  - [x] Integration tests: Browser environment (happy-dom) — `src/__tests__/browser.test.ts`, per-file `// @vitest-environment happy-dom` pragma
 
 ---
 

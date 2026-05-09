@@ -45,6 +45,7 @@ src/__tests__/
   levels.test.ts
   formatter.test.ts
   Konsole.test.ts
+  browser.test.ts          ← happy-dom integration tests
   transports/
     ConsoleTransport.test.ts
     HttpTransport.test.ts
@@ -59,6 +60,11 @@ Guidelines:
 - `FileTransport` tests should create temp files in `os.tmpdir()` and clean them up in `afterEach`.
 - When testing `HttpTransport`, pass `fetchImpl` explicitly (a `vi.fn()` mock) rather than relying on `globalThis.fetch`.
 - Run `npm run test:run` before committing. All tests must pass.
+
+Browser-environment tests:
+- Add `// @vitest-environment happy-dom` as the first line of the file. The default env (`node`) stays unchanged; the pragma overrides per-file.
+- `BrowserFormatter` captures `console.info/warn/error/debug` references at module load via `.bind(console)`, so a post-import `vi.spyOn(console, ...)` will not see formatter calls. Use `vi.hoisted()` to swap the console methods before the formatter module loads — see `src/__tests__/browser.test.ts` for the pattern.
+- Under happy-dom both `isBrowser` and `isNode` are true (it runs inside Node). Tests targeting browser-only behavior should gate on `isBrowser` checks in source code, not on `isNode === false`.
 
 ## Environment requirements
 
