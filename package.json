@@ -37,10 +37,7 @@
     "prepublishOnly": "npm run build",
     "benchmark": "node benchmarks/throughput.mjs",
     "benchmark:gc": "node --expose-gc benchmarks/throughput.mjs",
-    "benchmark:size": "node benchmarks/size.mjs",
-    "site:install": "npm install --prefix site",
-    "site:dev": "npm run --prefix site dev",
-    "site:build": "npm run --prefix site build"
+    "benchmark:size": "node benchmarks/size.mjs"
   },
   "keywords": [
     "log",
@@ -89,7 +86,7 @@
   "bugs": {
     "url": "https://github.com/shakcho/console-logger/issues"
   },
-  "homepage": "https://console-logger.saktichourasia.dev/docs/",
+  "homepage": "https://console-logger.saktichourasia.dev",
   "engines": {
     "node": ">=18.0.0"
   },

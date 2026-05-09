@@ -1,3 +1,8 @@
+---
+title: Viewing Logs
+description: Inspect in-memory logs from the browser console with getLogs() and viewLogs(). Filter by level, namespace, or any field — perfect for debugging in production.
+---
+
 # Viewing Logs
 
 Console stores all logs in memory, allowing you to inspect them later.

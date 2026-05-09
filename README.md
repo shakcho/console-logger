@@ -10,7 +10,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-first-blue.svg)](https://www.typescriptlang.org/)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](https://www.npmjs.com/package/konsole-logger)
 
-[Docs](https://console-logger.saktichourasia.dev/docs/) | [Live Demo](https://console-logger.saktichourasia.dev) | [Changelog](https://console-logger.saktichourasia.dev/docs/changelog)
+[Docs & Live Demo](https://console-logger.saktichourasia.dev) | [Changelog](https://console-logger.saktichourasia.dev/changelog)
 
 </div>
 
@@ -621,6 +621,6 @@ MIT © Sakti Kumar Chourasia
 
 <div align="center">
 
-[Report Bug](https://github.com/shakcho/console-logger/issues) | [Request Feature](https://github.com/shakcho/console-logger/issues) | [Docs](https://console-logger.saktichourasia.dev/docs/)
+[Report Bug](https://github.com/shakcho/console-logger/issues) | [Request Feature](https://github.com/shakcho/console-logger/issues) | [Docs](https://console-logger.saktichourasia.dev)
 
 </div>

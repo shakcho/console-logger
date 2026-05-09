@@ -1,3 +1,8 @@
+---
+title: Async Context Propagation
+description: Bind requestId, traceId, or userId to an async scope once and have every log line inside auto-include them — backed by Node.js AsyncLocalStorage.
+---
+
 # Async Context Propagation
 
 Bind request-scoped fields — `requestId`, `traceId`, `userId` — to an async scope once, and every log inside auto-includes them. No need to thread a child logger through every function call.

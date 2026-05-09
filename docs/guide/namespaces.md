@@ -1,3 +1,8 @@
+---
+title: Namespaces & Child Loggers
+description: Organize JavaScript logs by component with namespaces, and attach request context (requestId, userId, traceId) to every line with child loggers — Pino-compatible API.
+---
+
 # Namespaces & Child Loggers
 
 Namespaces organize your logs by component. Child loggers automatically attach context — request IDs, user IDs, trace IDs — to every line without passing them manually.

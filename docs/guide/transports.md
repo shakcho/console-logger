@@ -1,3 +1,8 @@
+---
+title: Transports
+description: Ship JavaScript logs to HTTP endpoints, files (with rotation + gzip), writable streams, or the console. Per-transport filter and transform, batching, exponential-backoff retry.
+---
+
 # Transports
 
 Transports forward log entries to external destinations — HTTP endpoints, log files, writable streams, or additional console output. You can use multiple transports simultaneously.

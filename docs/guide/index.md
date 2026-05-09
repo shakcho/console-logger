@@ -1,6 +1,11 @@
-# What is Console?
+---
+title: What is Console Logger?
+description: Console Logger is a structured, namespaced JavaScript and TypeScript logger that works in both browser and Node.js. Learn what it does and why developers choose it over plain console.log, Pino, Winston, or Bunyan.
+---
 
-Console is a structured, namespaced logging library for JavaScript and TypeScript that works in both **browser** and **Node.js** environments. It delivers structured output quality with great developer experience — beautiful terminal formatting, browser DevTools styling, and a clean API.
+# What is Console Logger?
+
+**Console Logger** (npm: `konsole-logger`) is a structured, namespaced JavaScript and TypeScript logger that works in both **browser** and **Node.js**. It's a drop-in upgrade from `console.log` that adds log levels, child loggers, structured JSON output, and pluggable transports — beautiful ANSI in your terminal, styled `%c` badges in DevTools, NDJSON in CI.
 
 - **Structured logging** with a consistent JSON schema
 - **Namespaced logging** for organized, component-specific logs

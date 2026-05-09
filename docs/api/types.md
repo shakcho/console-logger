@@ -1,3 +1,8 @@
+---
+title: Types
+description: TypeScript type definitions exported by konsole-logger — KonsoleOptions, LogEntry, Transport, TimestampFormat, FormatterOptions.
+---
+
 # Types
 
 Type definitions exported by `konsole-logger`.

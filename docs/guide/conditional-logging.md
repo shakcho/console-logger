@@ -1,3 +1,8 @@
+---
+title: Log Levels & Output
+description: Six numeric log levels (trace, debug, info, warn, error, fatal) plus three output formats — pretty ANSI, NDJSON, browser. Conditional logging without runtime overhead.
+---
+
 # Log Levels & Output
 
 Console gives you two orthogonal controls:

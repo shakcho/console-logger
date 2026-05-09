@@ -9,18 +9,111 @@ const pkg = JSON.parse(
   readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8'),
 ) as { version: string };
 
+const SITE_URL = 'https://console-logger.saktichourasia.dev';
+const SITE_TITLE = 'Console Logger';
+const SITE_TAGLINE = 'JavaScript Logger for Browser & Node.js';
+const DEFAULT_DESC =
+  'Console Logger is a structured, namespaced JavaScript and TypeScript logger for browser and Node.js. Six log levels, child loggers, beautiful console output, configurable timestamps, redaction, and flexible transports.';
+
 export default defineConfig({
-  title: 'Console',
-  description: 'Structured, namespaced logging for browser and Node.js',
+  title: SITE_TITLE,
+  titleTemplate: `:title — ${SITE_TITLE}`,
+  description: DEFAULT_DESC,
   appearance: 'dark',
-  base: '/docs/',
+  base: '/',
+
+  sitemap: {
+    hostname: SITE_URL,
+  },
+
+  vite: {
+    resolve: {
+      alias: {
+        'konsole-logger': fileURLToPath(new URL('../../src/index.ts', import.meta.url)),
+      },
+    },
+  },
 
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
-    ['meta', { name: 'description', content: 'Console is a structured, namespaced logging library for JavaScript and TypeScript. Works in browser and Node.js. Numeric log levels, child loggers, beautiful terminal output, and flexible transports.' }],
-    ['meta', { name: 'keywords', content: 'javascript logger, typescript logger, structured logging, namespaced logging, browser logger, node logger, child logger, pino, pino alternative, winston, bunyan, ndjson, log levels, zero dependency, isomorphic, file rotation, log rotation, devtools, lightweight, fast logger, esm' }],
-    ['meta', { property: 'og:description', content: 'Structured, namespaced logging for browser and Node.js. Numeric log levels, child loggers, beautiful terminal output, and flexible transports.' }],
+    ['meta', { name: 'author', content: 'Sakti Kumar Chourasia' }],
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:site_name', content: SITE_TITLE }],
+    ['meta', { property: 'og:image', content: `${SITE_URL}/logo.svg` }],
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+    ['meta', { name: 'twitter:image', content: `${SITE_URL}/logo.svg` }],
+    ['meta', { name: 'twitter:creator', content: '@shakcho' }],
+    [
+      'script',
+      {
+        defer: '',
+        src: 'https://cdn.salesflyer.app/t.js?v=15a3f536',
+        'data-website-id': 'sf_P24rzGxl2sbp1C0T',
+        'data-host-url': 'http://api.salesflyer.app',
+        'data-performance': 'true',
+      },
+    ],
+    [
+      'script',
+      { type: 'application/ld+json' },
+      JSON.stringify({
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'WebSite',
+            '@id': `${SITE_URL}/#website`,
+            url: SITE_URL,
+            name: SITE_TITLE,
+            description: DEFAULT_DESC,
+            inLanguage: 'en',
+          },
+          {
+            '@type': 'SoftwareApplication',
+            '@id': `${SITE_URL}/#software`,
+            name: 'konsole-logger',
+            alternateName: ['Console Logger', 'Konsole'],
+            description: DEFAULT_DESC,
+            applicationCategory: 'DeveloperApplication',
+            operatingSystem: 'Cross-platform (Browser, Node.js)',
+            programmingLanguage: ['JavaScript', 'TypeScript'],
+            url: SITE_URL,
+            downloadUrl: 'https://www.npmjs.com/package/konsole-logger',
+            license: 'https://opensource.org/licenses/MIT',
+            offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+            author: {
+              '@type': 'Person',
+              name: 'Sakti Kumar Chourasia',
+              url: 'https://saktichourasia.dev',
+            },
+          },
+        ],
+      }),
+    ],
   ],
+
+  transformHead({ pageData, siteData }) {
+    const path = pageData.relativePath.replace(/(?:index)?\.md$/, '');
+    const canonical = `${SITE_URL}/${path}`.replace(/\/+$/, '/');
+    const desc =
+      (pageData.frontmatter.description as string | undefined) ?? siteData.description;
+
+    // Match VitePress's <title> rule: titleTemplate: false → use bare title.
+    const titleText = pageData.title || siteData.title;
+    const tt = pageData.frontmatter.titleTemplate;
+    const fullTitle =
+      tt === false || titleText === siteData.title
+        ? titleText
+        : `${titleText} — ${SITE_TITLE}`;
+
+    return [
+      ['link', { rel: 'canonical', href: canonical }],
+      ['meta', { property: 'og:url', content: canonical }],
+      ['meta', { property: 'og:title', content: fullTitle }],
+      ['meta', { property: 'og:description', content: desc }],
+      ['meta', { name: 'twitter:title', content: fullTitle }],
+      ['meta', { name: 'twitter:description', content: desc }],
+    ];
+  },
 
   themeConfig: {
     logo: '/logo.svg',
@@ -28,7 +121,6 @@ export default defineConfig({
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'API', link: '/api/' },
-      { text: 'Live Demo', link: 'https://console-logger.saktichourasia.dev' },
       {
         text: `v${pkg.version}`,
         items: [

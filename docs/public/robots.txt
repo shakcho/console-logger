@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://console-logger.saktichourasia.dev/sitemap.xml
