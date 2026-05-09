@@ -1,3 +1,8 @@
+---
+title: Browser Debugging
+description: Debug live JavaScript apps from the browser console. Console Logger exposes window.__Konsole — change log levels, view buffered logs, and toggle output without redeploying.
+---
+
 # Browser Debugging
 
 Console can expose itself to the browser window, allowing you to debug production applications from the developer console.

@@ -1,3 +1,8 @@
+---
+title: Timestamps
+description: Configure log timestamps in Console Logger — ISO 8601, epoch seconds/ms, time-only, custom function, or nanosecond precision. Change format at runtime.
+---
+
 # Timestamps
 
 Every log entry includes a timestamp. By default, Console uses `datetime` format — a full local date and time with millisecond precision:

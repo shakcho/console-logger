@@ -1,3 +1,8 @@
+---
+title: Redaction
+description: Mask passwords, tokens, and PII in logs with dot-notation paths. Applied before any output, transport, or buffer — children inherit parent paths.
+---
+
 # Redaction
 
 Redaction automatically masks sensitive field values before they reach any output, transport, or buffer. Passwords, tokens, credit card numbers, and other PII are replaced with `'[REDACTED]'` — nothing leaks.

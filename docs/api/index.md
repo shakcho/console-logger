@@ -1,3 +1,8 @@
+---
+title: API Reference
+description: Console Logger API reference — every exported class, method, and type. Konsole, transports, formatters, redaction, async context.
+---
+
 # API Reference
 
 Detailed documentation for all Console exports.

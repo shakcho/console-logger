@@ -1,3 +1,8 @@
+---
+title: Performance
+description: Console Logger benchmarks against Pino, Winston, and Bunyan. ~10 KB gzipped, zero dependencies, ~8M ops/sec disabled, ~650K ops/sec NDJSON output.
+---
+
 # Performance
 
 Console is built for production. It adds minimal overhead to your application while offering structured logging, child loggers, configurable timestamps, and flexible transports — all in a ~10 KB gzipped bundle with zero dependencies.

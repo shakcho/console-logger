@@ -1,3 +1,8 @@
+---
+title: Konsole Class
+description: API reference for the Konsole class — constructor options, log methods (trace/debug/info/warn/error/fatal), child loggers, transports, and runtime controls.
+---
+
 # Konsole Class
 
 The main logging class. Works in browser and Node.js.

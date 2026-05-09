@@ -1,3 +1,8 @@
+---
+title: Configuration
+description: Configure Console Logger — namespace, log level, output format, timestamps, redaction, transports, and worker mode for browser and Node.js.
+---
+
 # Configuration
 
 Console accepts options to customize its behavior. The most commonly used ones are `namespace`, `level`, and `format`.

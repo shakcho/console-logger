@@ -1,4 +1,11 @@
-# Getting Started
+---
+title: Getting Started
+description: Install Console Logger and write your first structured log line in browser or Node.js. Six log levels, child loggers, namespaces, and zero configuration.
+---
+
+# Getting Started with Console Logger
+
+Install `konsole-logger` and write your first structured log line in under a minute. Works in browser and Node.js with zero configuration.
 
 ## Installation
 
