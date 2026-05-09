@@ -20,6 +20,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: read
 
 jobs:
   benchmark:
@@ -36,9 +37,11 @@ jobs:
       - run: npm run build
 
       # Install competitors for comparison
-      - run: npm install --no-save pino winston bunyan
+      - run: npm install --no-save pino winston bunyan consola
 
-      # Run throughput benchmark and capture output
+      # Run throughput benchmark and capture output. Throughput.mjs writes
+      # ./benchmark-throughput.json with structured metrics in addition to
+      # human-readable console output.
       - name: Run throughput benchmark
         id: bench
         run: |
@@ -48,7 +51,7 @@ jobs:
           node benchmarks/throughput.mjs 2>&1 | tee benchmark-output.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
-      # Run size benchmark
+      # Run size benchmark; writes ./benchmark-size.json
       - name: Run size benchmark
         run: |
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -58,41 +61,77 @@ jobs:
           node benchmarks/size.mjs 2>&1 | tee -a benchmark-output.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
-      # Store benchmark results as artifact
-      - name: Upload benchmark results
+      # Pull the most recent baseline JSON from the latest successful main run.
+      # Missing artifact (first run, deleted, etc.) is non-fatal — compare.mjs
+      # will mark every metric as 🆕.
+      - name: Download baseline benchmark from main
+        if: github.event_name == 'pull_request'
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: benchmark.yml
+          branch: main
+          name: benchmark-baseline-main
+          path: baseline
+          if_no_artifact_found: warn
+          search_artifacts: true
+
+      # Build markdown comparison report (traffic-light tables per metric).
+      # Always exits 0 — never blocks the merge.
+      - name: Compare against baseline
+        if: github.event_name == 'pull_request'
+        env:
+          KONSOLE_RAW_OUTPUT: ${{ github.workspace }}/benchmark-output.txt
+        run: node benchmarks/compare.mjs
+
+      # Store this run's full results as a per-SHA artifact (kept 90 days).
+      - name: Upload per-SHA benchmark results
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results-${{ github.sha }}
-          path: benchmark-output.txt
+          path: |
+            benchmark-output.txt
+            benchmark-throughput.json
+            benchmark-size.json
           retention-days: 90
 
-      # Post comment on PR with benchmark results
+      # On main pushes & schedule, also upload under a stable name so PR runs
+      # can fetch this as the baseline. Overwrites the previous baseline.
+      - name: Upload baseline benchmark (main only)
+        if: github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-baseline-main
+          path: |
+            benchmark-throughput.json
+            benchmark-size.json
+          retention-days: 90
+          overwrite: true
+
+      # Post comment on PR with benchmark comparison
       - name: Comment on PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const output = fs.readFileSync('benchmark-output.txt', 'utf8');
+            let body;
+            try {
+              body = fs.readFileSync('benchmark-report.md', 'utf8');
+            } catch (e) {
+              // Fallback if compare.mjs failed to write a report — embed raw output.
+              const raw = fs.readFileSync('benchmark-output.txt', 'utf8');
+              body = '## 📊 Benchmark Results\n\n' +
+                '_Comparison report unavailable — showing raw output._\n\n' +
+                '<details><summary>Full output</summary>\n\n```\n' + raw + '\n```\n</details>';
+            }
 
-            // Extract key numbers
-            const lines = output.split('\n');
-            const konsoleLines = lines.filter(l => l.includes('Konsole'));
-            const pinoLines = lines.filter(l => l.includes('Pino'));
-
-            let body = '## Benchmark Results\n\n';
-            body += '<details><summary>Full output</summary>\n\n```\n';
-            body += output;
-            body += '\n```\n</details>';
-
-            // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            const existing = comments.find(c =>
-              c.user.type === 'Bot' && c.body.includes('## Benchmark Results')
+            const existing = comments.find((c) =>
+              c.user.type === 'Bot' && c.body.includes('📊 Benchmark Results'),
             );
 
             if (existing) {

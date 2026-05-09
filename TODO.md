@@ -87,7 +87,7 @@ Goal: universal logging library (Browser + Node.js) competitive with Pino.js, wi
   - [x] File transport: write throughput (NDJSON lines/sec to disk)
   - [x] Publish results in `docs/guide/performance.md` and `benchmarks/README.md`
   - [x] Add `npm run benchmark` script
-  - [ ] CI job to track regressions (optional)
+  - [x] CI job to track regressions — `benchmarks/compare.mjs` + `.github/workflows/benchmark.yml`; emits 🟢/🟡/🔴/🆕 markdown tables per metric on PRs, baseline tracked as a stable artifact from `main`. Non-blocking by design.
 
 - [x] **Hot path optimization (close gap with Pino)**
   - [x] Lazy Date via `Object.create(ENTRY_PROTO)` — prototype getter materializes Date on first access

@@ -40,7 +40,7 @@ Measured on Apple M2 Max, Node.js v23.11.0, 100K iterations per benchmark.
 | Dependencies | 0 | 11 | 11 | 0 |
 
 ::: info Reproducing benchmarks
-Microbenchmark numbers at the nanosecond level vary between runs due to V8 JIT state, GC, and OS scheduling. Run `npm run benchmark` to see numbers on your hardware. Install competitors first with `npm install --no-save pino winston bunyan`.
+Microbenchmark numbers at the nanosecond level vary between runs due to V8 JIT state, GC, and OS scheduling. Run `npm run benchmark` to see numbers on your hardware. Install competitors first with `npm install --no-save pino winston bunyan consola`.
 :::
 
 ## Buffer Mode
@@ -171,7 +171,7 @@ useEffect(() => {
 ```bash
 npm run build
 npm run benchmark                          # Console only
-npm install --no-save pino winston bunyan  # install competitors
+npm install --no-save pino winston bunyan consola  # install competitors
 npm run benchmark                          # full comparison
 npm run benchmark:size                     # bundle size analysis
 npm run benchmark:gc                       # with GC stats

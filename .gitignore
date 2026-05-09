@@ -39,3 +39,10 @@ lerna-debug.log*
 
 # TypeScript cache
 *.tsbuildinfo
+
+# Benchmark outputs (regenerated locally + in CI)
+benchmark-throughput.json
+benchmark-size.json
+benchmark-output.txt
+benchmark-report.md
+baseline/
