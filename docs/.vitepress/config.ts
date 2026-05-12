@@ -49,8 +49,16 @@ export default defineConfig({
         defer: '',
         src: 'https://cdn.salesflyer.app/t.js?v=15a3f536',
         'data-website-id': 'sf_P24rzGxl2sbp1C0T',
-        'data-host-url': 'http://api.salesflyer.app',
+        'data-host-url': 'https://api.salesflyer.app',
         'data-performance': 'true',
+      },
+    ],
+    [
+      'script',
+      {
+        async: '',
+        src: 'https://analytics.ahrefs.com/analytics.js',
+        'data-key': 'aUeAqs8tOUw2iSBT4fpGXw',
       },
     ],
     [
