@@ -546,18 +546,31 @@ Benchmarked on Apple M5 Max, Node.js v24.15 (100K iterations).
 
 ### What matters in production: structured JSON throughput
 
-For most apps the only number that matters is "how fast can the logger actually emit a structured log line." Silent / disabled benchmarks (further down) measure call-site overhead, but you don't ship loggers silenced — you ship them writing JSON to stdout, a file, or a stream.
+For most apps the only number that matters is "how fast can the logger actually emit a structured log line." We measure it two ways, both writing newline-delimited JSON to `/dev/null`, fully flushed.
+
+**Realistic production — async / buffered.** How loggers run in a real app: each uses its natural buffered path (Console's `StreamTransport`, Pino's async `sonic-boom`, a Node `WriteStream` for the rest) through the same async I/O. Time to emit **and fully flush** 100K lines.
+
+| Logger | ops/sec |
+|---|---:|
+| **Console** (JSON, async) | **~790K** |
+| Consola (JSON, async) | ~750K |
+| Bunyan (JSON, async) | ~655K |
+| Winston (JSON, async) | ~615K |
+| Pino (JSON, async) | ~500K |
+
+On the buffered path production actually uses, **Console is the fastest of the field** — its `StreamTransport` keeps the stream's write buffer deep (batched flush, tunable via `flushBatchSize`) so the OS write path never idles between drains.
+
+**Strict per-line cost — synchronous.** Worst case: every logger serializes its own JSON and performs a synchronous `write(2)` on every call — no batching, no async buffer.
 
 | Logger | ops/sec | p50 | p95 | p99 |
 |---|---:|---:|---:|---:|
-| **Console** (JSON → /dev/null) | **4.16M** | **125 ns** | **167 ns** | **958 ns** |
-| Consola (JSON → /dev/null) | 795.9K | 1.13 µs | 1.37 µs | 2.17 µs |
-| Bunyan (child → /dev/null) | 752.0K | 1.08 µs | 1.38 µs | 2.25 µs |
-| Bunyan (JSON → /dev/null) | 741.8K | 1.25 µs | 1.46 µs | 2.33 µs |
-| Winston (JSON → /dev/null) | 672.9K | 917 ns | 1.75 µs | 2.17 µs |
-| Pino (JSON → /dev/null) | 560.5K | 1.63 µs | 2.67 µs | 3.38 µs |
+| Pino (JSON → /dev/null) | ~710K | 1.10 µs | 1.30 µs | 2.7 µs |
+| **Console** (JSON → /dev/null) | **~595K** | **1.42 µs** | **1.84 µs** | **1.96 µs** |
+| Consola (JSON → /dev/null) | ~580K | 1.54 µs | 1.74 µs | 1.92 µs |
+| Bunyan (JSON → /dev/null) | ~505K | 1.70 µs | 1.85 µs | 2.09 µs |
+| Winston (JSON → /dev/null) | ~435K | 1.49 µs | 1.74 µs | 2.12 µs |
 
-Console emits structured JSON **~5× faster than Consola, Bunyan, and Winston, and ~7× faster than Pino**. p50 latency is roughly an order of magnitude lower than every competitor.
+With every write forced synchronous, Pino's `sonic-boom` leads — that's what it's built for — and Console is a close second, ahead of Consola, Bunyan, and Winston, while shipping zero dependencies and running natively in the browser.
 
 ### Microbenchmark: disabled / silent overhead
 
@@ -565,14 +578,14 @@ This measures how cheap a *filtered-out* log call is — i.e. what your code pay
 
 | Logger | Mode | ops/sec |
 |---|---|---:|
-| Pino | child, disabled | 34.02M |
-| **Console** | child, no buffer | 32.86M |
-| Consola | tagged child, silent | 22.60M |
-| Consola | silent | 15.24M |
-| Pino | disabled | 13.57M |
-| **Console** | silent, no buffer | 13.45M |
-| Winston | silent | 2.98M |
-| Winston | child, silent | 2.12M |
+| Pino | child, disabled | 34.47M |
+| **Console** | child, no buffer | 33.04M |
+| Consola | tagged child, silent | 32.73M |
+| Consola | silent | 12.69M |
+| Pino | disabled | 12.23M |
+| **Console** | silent, no buffer | 10.38M |
+| Winston | silent | 2.45M |
+| Winston | child, silent | 2.32M |
 
 Console, Pino, and Consola sit in the same fast-path tier (within run-to-run V8 noise). Winston is a tier below.
 

@@ -132,6 +132,11 @@ export class FileTransport extends StreamTransport {
     }
   }
 
+  /** Stop a batch flush the moment rotation begins so we never write to a closing stream. */
+  protected override shouldHaltFlush(): boolean {
+    return this.rotating;
+  }
+
   /**
    * Resolves once the underlying file stream has been opened.
    * Not required for normal use — entries are buffered automatically.
