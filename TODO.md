@@ -100,7 +100,7 @@ Goal: universal logging library (Browser + Node.js) competitive with Pino.js, wi
   - [x] `_isSilent` / `_hasTransports` / `_bufferEnabled` cached flags
   - [x] **Pino-style method replacement** — `.info()` etc. replaced with `noop` when level is above threshold or logger is silent; `setLevel()` / `addTransport()` re-bind all 7 methods
   - [x] Target achieved: 7M ops/sec silent, 13.7M child-no-buffer (was 3.1M / 5.1M)
-  - [ ] Make `messages: args` storage opt-in or remove — costs ~20-30 bytes per entry in buffer mode
+  - [x] Make `messages: args` storage opt-in — `keepMessages: false` by default; saves ~20-30 bytes per entry plus the args-array alloc in buffer mode and the per-entry `JSON.stringify` map in worker mode. `BrowserFormatter` falls back to `entry.fields` for expandable DevTools output
 
 - [ ] **OpenTelemetry transport (OTLP/HTTP)**
   - [ ] `OtlpTransport` that speaks OTLP/HTTP JSON protocol (no gRPC dependency)

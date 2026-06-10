@@ -14,7 +14,7 @@ Represents a single log entry stored in the circular buffer.
 ```typescript
 type LogEntry = {
   msg: string;                       // primary message string
-  messages: unknown[];               // original arguments (kept for compatibility)
+  messages?: unknown[];              // original arguments — only when keepMessages: true
   fields: Record<string, unknown>;   // structured key-value pairs (includes bindings)
   timestamp: Date;
   hrTime?: number;                   // high-res nanosecond offset (when highResolution: true)
@@ -30,7 +30,7 @@ type LogEntry = {
 | Property | Type | Description |
 |----------|------|-------------|
 | `msg` | `string` | The primary log message |
-| `messages` | `unknown[]` | Original arguments passed to the log method |
+| `messages` | `unknown[] \| undefined` | Original arguments — populated only when the logger sets `keepMessages: true` (off by default to save per-entry footprint) |
 | `fields` | `Record<string, unknown>` | Structured key-value pairs (child bindings merged with call-site fields) |
 | `timestamp` | `Date` | When the log was created |
 | `hrTime` | `number \| undefined` | High-resolution monotonic timestamp in nanoseconds (present when `highResolution: true`) |
@@ -49,13 +49,15 @@ logger.error('Something failed', { code: 500, path: '/users' });
 const [entry] = logger.getLogs();
 // {
 //   msg: 'Something failed',
-//   messages: ['Something failed', { code: 500, path: '/users' }],
 //   fields: { code: 500, path: '/users' },
 //   timestamp: Date,
 //   namespace: 'App',
 //   level: 'error',
 //   levelValue: 50,
 // }
+//
+// Pass `keepMessages: true` to additionally preserve the original args as
+// `entry.messages: ['Something failed', { code: 500, path: '/users' }]`.
 ```
 
 ---
@@ -120,6 +122,7 @@ interface KonsoleOptions {
   retentionPeriod?: number;
   cleanupInterval?: number;
   useWorker?: boolean;
+  keepMessages?: boolean;
   criteria?: Criteria; // @deprecated
 }
 ```
@@ -139,6 +142,7 @@ interface KonsoleOptions {
 | `retentionPeriod` | `number` | `172800000` | 48 hours in ms |
 | `cleanupInterval` | `number` | `3600000` | 1 hour in ms |
 | `useWorker` | `boolean` | `false` | Worker mode (Web Worker in browser, `worker_threads` in Node.js) |
+| `keepMessages` | `boolean` | `false` | Preserve the original `args` array on each entry as `messages`. Off by default to save per-entry memory; turn on when reading `entry.messages` from `getLogs()` consumers, or to surface every object arg as expandable in `BrowserFormatter` |
 | `criteria` | `Criteria` | `true` | Output filter *(deprecated — use `level` and `format`)* |
 
 ---

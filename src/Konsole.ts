@@ -104,6 +104,8 @@ export class Konsole implements KonsolePublic {
   private cleanupIntervalId?: ReturnType<typeof setInterval>;
   private useWorker: boolean;
   private transports: Transport[] = [];
+  /** When true, the original args array is preserved on each entry as `messages`. */
+  private _keepMessages: boolean = false;
 
   /** Pre-compiled redaction path segments. Empty array = no redaction. */
   private _redactPaths: string[][] = [];
@@ -144,6 +146,7 @@ export class Konsole implements KonsolePublic {
       maxLogs = 10000,
       buffer,
       useWorker = false,
+      keepMessages = false,
       transports = [],
       timestamp,
       redact = [],
@@ -164,6 +167,7 @@ export class Konsole implements KonsolePublic {
     this.retentionPeriod = retentionPeriod;
     this.maxLogs         = maxLogs;
     this.useWorker = useWorker;
+    this._keepMessages = keepMessages;
 
     // Buffer defaults: on in browser (for getLogs/viewLogs/exposeToWindow), off in Node.js
     this._bufferEnabled = buffer ?? isBrowser;
@@ -415,6 +419,7 @@ export class Konsole implements KonsolePublic {
     // ── Shared references (mutations in parent are visible in child and vice-versa) ──
     child.logs      = parent.logs;      // same circular buffer
     child.useWorker = parent.useWorker;
+    child._keepMessages = parent._keepMessages;
 
     // ── Separate array, same Transport instances (child.addTransport won't affect parent) ──
     child.transports = [...parent.transports];
@@ -813,7 +818,6 @@ export class Konsole implements KonsolePublic {
 
     const rawEntry: LogEntry = {
       msg,
-      messages: args,
       fields: entryFields,
       timestamp: new Date(),
       hrTime: this.highResolution ? getHrTime() : undefined,
@@ -821,6 +825,7 @@ export class Konsole implements KonsolePublic {
       level,
       levelValue: LEVELS[level],
     };
+    if (this._keepMessages) rawEntry.messages = args;
 
     // Apply redaction before any consumer sees the entry.
     // The disable flag is only settable via window.__Konsole (browser-only API),
@@ -838,7 +843,6 @@ export class Konsole implements KonsolePublic {
     if (this.useWorker && Konsole.sharedWorker) {
       const serializable: SerializableLogEntry = {
         msg,
-        messages: args.map((m) => (typeof m === 'object' ? JSON.stringify(m) : m)),
         fields: entry.fields,
         timestamp: entry.timestamp.toISOString(),
         hrTime: entry.hrTime,
@@ -846,6 +850,9 @@ export class Konsole implements KonsolePublic {
         level,
         levelValue: LEVELS[level],
       };
+      if (this._keepMessages) {
+        serializable.messages = args.map((m) => (typeof m === 'object' ? JSON.stringify(m) : m));
+      }
       Konsole.sharedWorker.postMessage({
         type: 'ADD_LOG',
         namespace: this.namespace,
