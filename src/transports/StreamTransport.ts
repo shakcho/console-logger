@@ -47,6 +47,22 @@ export interface StreamTransportOptions {
    * Use this to surface dropped logs (alerting, metrics).
    */
   onDrop?: (entries: LogEntry[], reason: string) => void;
+  /**
+   * How many queued entries to flush into the stream on each `'drain'` event.
+   *
+   * The stream signals backpressure (its `write()` returns `false`) once its
+   * internal buffer hits the high-water mark — typically after only ~16 KB.
+   * If we stopped feeding it at that first signal and waited for the buffer to
+   * fully empty before refilling, the write pipeline would idle for half of
+   * every drain cycle, capping throughput far below the stream's real capacity.
+   *
+   * Instead we keep feeding the stream past the high-water mark, up to this many
+   * entries per drain, so its buffer stays deep and the OS write path stays
+   * saturated. Memory is still bounded: at most `flushBatchSize` entries sit in
+   * the stream's buffer, and the rest wait in the (capped) `pending` queue.
+   * @default 4096
+   */
+  flushBatchSize?: number;
 }
 
 /**
@@ -88,6 +104,7 @@ export class StreamTransport implements Transport {
   protected maxQueueSize: number;
   protected overflowStrategy: 'drop-oldest' | 'drop-newest';
   protected onDrop?: (entries: LogEntry[], reason: string) => void;
+  protected flushBatchSize: number;
 
   constructor(options: StreamTransportOptions) {
     if (!isNode) {
@@ -100,6 +117,7 @@ export class StreamTransport implements Transport {
     this.maxQueueSize     = options.maxQueueSize     ?? Infinity;
     this.overflowStrategy = options.overflowStrategy ?? 'drop-oldest';
     this.onDrop           = options.onDrop;
+    this.flushBatchSize   = options.flushBatchSize   ?? 4096;
 
     this.attachStreamListeners(this.stream);
   }
@@ -131,23 +149,36 @@ export class StreamTransport implements Transport {
   }
 
   /**
-   * Perform the actual `stream.write`. Subclasses can override to track
-   * additional state (e.g. byte counts for size-based rotation) but should
-   * preserve the paused-flag side effect.
+   * Serialize and write one entry. Returns the stream's backpressure signal
+   * (`false` once the buffer is past its high-water mark). Does not touch the
+   * paused flag — callers decide what to do with the signal.
    */
-  protected doStreamWrite(entry: LogEntry): void {
+  protected rawWrite(entry: LogEntry): boolean {
     try {
       const line = toLine(entry, this.format) + '\n';
       const ok   = this.stream.write(line);
       this.afterWrite(entry, line, ok);
-      if (!ok) this.paused = true;
+      return ok;
     } catch (err) {
       console.error(`[Konsole StreamTransport: ${this.name}] Write error:`, err);
+      return true; // treat a write error as "keep going" rather than wedging the queue
     }
+  }
+
+  /**
+   * Write one entry on the live path, pausing the producer if the stream is now
+   * backpressured. Subclasses may override to track additional state, but should
+   * preserve the paused-flag side effect.
+   */
+  protected doStreamWrite(entry: LogEntry): void {
+    if (!this.rawWrite(entry)) this.paused = true;
   }
 
   /** Hook for subclasses to react to a successful (or attempted) write. */
   protected afterWrite(_entry: LogEntry, _line: string, _ok: boolean): void {}
+
+  /** Hook: subclasses return true to halt an in-progress batch flush (e.g. mid-rotation). */
+  protected shouldHaltFlush(): boolean { return false; }
 
   /** Append to the pending queue, dropping per overflow strategy when full. */
   protected enqueuePending(entry: LogEntry): void {
@@ -164,11 +195,28 @@ export class StreamTransport implements Transport {
     this.pending.push(entry);
   }
 
-  /** Drain queued entries until the stream pauses again or the queue empties. */
+  /**
+   * Flush queued entries on `'drain'`. We deliberately keep writing past the
+   * stream's high-water mark — up to `flushBatchSize` entries — so the stream's
+   * buffer stays deep and the OS write path never idles between drain cycles.
+   * (Stopping at the first backpressure signal lets the buffer fully empty
+   * before refilling, which roughly halves throughput.) The producer resumes
+   * only once the backlog is gone and the stream has room again.
+   */
   protected flushPending(): void {
-    while (!this.paused && this.pending.length > 0) {
-      this.doStreamWrite(this.pending.shift()!);
+    const queue = this.pending;
+    const limit = Math.min(queue.length, this.flushBatchSize);
+    let i = 0;
+    let ok = true;
+    while (i < limit && !this.shouldHaltFlush()) {
+      ok = this.rawWrite(queue[i]);
+      i++;
     }
+    // Drop the flushed prefix in a single O(remaining) slice. Using
+    // `queue.shift()` per entry would make a full-batch flush O(n²) — fatal
+    // for a large backlog.
+    this.pending = i >= queue.length ? [] : queue.slice(i);
+    this.paused = this.pending.length > 0 || !ok;
   }
 
   protected notifyDropped(entries: LogEntry[], reason: string): void {

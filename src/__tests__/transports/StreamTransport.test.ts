@@ -151,6 +151,50 @@ describe('StreamTransport', () => {
       expect(JSON.parse(lines[2].trim()).msg).toBe('third');
     });
 
+    it('flushes a large backlog on drain in order, losing nothing', () => {
+      const { stream, lines, setReady } = makeControllableStream();
+      const t = new StreamTransport({ stream, flushBatchSize: Infinity });
+
+      // Build a big backlog while paused (regression guard for the O(n²)
+      // per-entry shift() that made large flushes pathologically slow).
+      setReady(false);
+      const COUNT = 5_000;
+      for (let i = 0; i < COUNT; i++) t.write(makeEntry({ msg: `m-${i}` }));
+
+      // One write reached the stream; the rest are queued.
+      expect(lines).toHaveLength(1);
+
+      setReady(true);
+
+      expect(lines).toHaveLength(COUNT);
+      // Order preserved end-to-end.
+      expect(JSON.parse(lines[0].trim()).msg).toBe('m-0');
+      expect(JSON.parse(lines[COUNT - 1].trim()).msg).toBe(`m-${COUNT - 1}`);
+    });
+
+    it('flushBatchSize caps how many entries flush per drain', () => {
+      const { stream, lines, setReady } = makeControllableStream();
+      const t = new StreamTransport({ stream, flushBatchSize: 2 });
+
+      setReady(false);
+      // 1 reaches the stream, 4 queue up.
+      for (let i = 0; i < 5; i++) t.write(makeEntry({ msg: `m-${i}` }));
+      expect(lines).toHaveLength(1);
+
+      // First drain flushes only the batch of 2 → 1 + 2 = 3 lines so far.
+      setReady(true);
+      expect(lines).toHaveLength(3);
+      expect(JSON.parse(lines[1].trim()).msg).toBe('m-1');
+      expect(JSON.parse(lines[2].trim()).msg).toBe('m-2');
+
+      // Next drain flushes the remaining 2 — still in order.
+      setReady(false);
+      setReady(true);
+      expect(lines).toHaveLength(5);
+      expect(JSON.parse(lines[3].trim()).msg).toBe('m-3');
+      expect(JSON.parse(lines[4].trim()).msg).toBe('m-4');
+    });
+
     it('drops oldest entry when maxQueueSize is exceeded (default)', () => {
       const { stream, setReady } = makeControllableStream();
       const onDrop = vi.fn();
