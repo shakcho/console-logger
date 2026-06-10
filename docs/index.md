@@ -109,30 +109,40 @@ Measured on Apple M5 Max, Node.js v24.15, 100K iterations. Pino, Winston, and Bu
 are Node.js only; Consola runs in the browser but without worker offloading. Console
 runs in both with worker offloading. Run `npm run benchmark` to reproduce.
 
-**Production throughput** — emitting structured JSON to a stream (the path that runs in real apps; higher is better)
+**Production throughput** — async / buffered JSON, the path real apps use; time to emit + fully flush 100K lines to `/dev/null` (higher is better)
+
+| Logger                  | ops/sec        |
+| ----------------------- | -------------- |
+| **Console**             | **~790K**      |
+| Consola                 | ~750K          |
+| Bunyan                  | ~655K          |
+| Winston                 | ~615K          |
+| Pino                    | ~500K          |
+
+**Strict per-line cost** — every logger serializes and *synchronously* writes each line (worst-case; no batching). Pino's `sonic-boom` leads here; Console is a close second.
 
 | Logger                  | ops/sec        | p50      |
 | ----------------------- | -------------- | -------- |
-| **Console**             | **4.16M**      | **125 ns** |
-| Consola                 | 795.9K         | 1.13 µs  |
-| Bunyan                  | 741.8K         | 1.25 µs  |
-| Winston                 | 672.9K         | 917 ns   |
-| Pino                    | 560.5K         | 1.63 µs  |
+| Pino                    | ~710K          | 1.10 µs  |
+| **Console**             | **~595K**      | **1.42 µs** |
+| Consola                 | ~580K          | 1.54 µs  |
+| Bunyan                  | ~505K          | 1.70 µs  |
+| Winston                 | ~435K          | 1.49 µs  |
 
 **Disabled / silent** — microbenchmark for per-call overhead (not a realistic throughput; nobody ships silenced loggers)
 
 | Mode                          | Console    | Pino     | Consola  | Winston  |
 | ----------------------------- | ---------- | -------- | -------- | -------- |
-| Silent / disabled             | 13.45M     | 13.57M   | 15.24M   | 2.98M    |
-| Child (silent / disabled)     | 32.86M     | 34.02M   | 22.60M   | 2.12M    |
+| Silent / disabled             | 10.38M     | 12.23M   | 12.69M   | 2.45M    |
+| Child (silent / disabled)     | 33.04M     | 34.47M   | 32.73M   | 2.32M    |
 
-Console, Pino, and Consola are within run-to-run V8 noise on the silent path — the gap shows up where it matters: actually emitting log lines.
+Console, Pino, and Consola are within run-to-run V8 noise on the silent path. On the buffered path real apps use, **Console is the fastest of the field** — and on the worst-case synchronous-per-line test it's a close second to Pino's `sonic-boom` — all with zero dependencies and native browser support.
 
 **Browser-only**
 
 | Scenario             | Console        |
 | -------------------- | -------------- |
-| Silent + buffer      | **6.01M**      |
+| Silent + buffer      | **6.15M**      |
 | With Worker          | **non-blocking** |
 
 **Bundle & install size** (smaller is better)

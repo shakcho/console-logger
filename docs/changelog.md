@@ -22,6 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Migration
 
 - If you read `entry.messages` from `getLogs()` / `viewLogs()` or a custom transport, either pass `keepMessages: true` on the logger or migrate to `entry.msg` + `entry.fields`, which together capture the same information for the supported calling conventions
+### Performance
+
+- **`StreamTransport` / `FileTransport` async throughput** — ~20× faster flushing a backlog to a buffered stream (~40K → ~790K lines/sec to `/dev/null`)
+  - Fixed an `O(n²)` drain: `flushPending` dequeued with `Array.prototype.shift()` per entry, so draining a large backlog was quadratic. It now advances by index and slices once (`O(n)`)
+  - On each `'drain'`, the transport now flushes a batch past the stream's high-water mark so the write buffer stays deep and the OS write path doesn't idle between drain cycles. Tunable via the new `flushBatchSize` option (default `4096`); memory stays bounded by `flushBatchSize` + the existing `maxQueueSize` pending cap
+  - `FileTransport` halts an in-progress batch flush the moment rotation begins, so no entries are written to a closing stream
+
+### Added
+
+- **`StreamTransport.flushBatchSize`** — entries flushed into the stream per `'drain'` event (default `4096`)
 
 ---
 
