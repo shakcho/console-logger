@@ -796,4 +796,37 @@ describe('Konsole', () => {
       (Konsole as unknown as Record<string, unknown>)['_hooksRegistered'] = false;
     });
   });
+
+  describe('keepMessages', () => {
+    it('omits messages from buffered entries by default', () => {
+      const logger = makeSilentLogger({ namespace: 'NoMessages' });
+      logger.info('hello', { a: 1 });
+      const [entry] = logger.getLogs();
+      expect(entry.messages).toBeUndefined();
+      expect(entry.msg).toBe('hello');
+      expect(entry.fields).toEqual({ a: 1 });
+    });
+
+    it('preserves the original args when keepMessages: true', () => {
+      const logger = makeSilentLogger({ namespace: 'WithMessages', keepMessages: true });
+      logger.info('hello', { a: 1 });
+      const [entry] = logger.getLogs();
+      expect(entry.messages).toEqual(['hello', { a: 1 }]);
+    });
+
+    it('omits messages from transport entries by default', () => {
+      const spy = new SpyTransport();
+      const logger = makeSilentLogger({ namespace: 'NoMessagesT', transports: [spy] });
+      logger.info('hello', { a: 1 });
+      expect(spy.entries[0].messages).toBeUndefined();
+    });
+
+    it('child inherits keepMessages from parent', () => {
+      const parent = makeSilentLogger({ namespace: 'KMParent', keepMessages: true });
+      const child = parent.child({ requestId: 'r1' });
+      child.info('hello');
+      const [entry] = parent.getLogs();
+      expect(entry.messages).toEqual(['hello']);
+    });
+  });
 });

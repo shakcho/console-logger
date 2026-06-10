@@ -47,8 +47,13 @@ export interface TimestampOptions {
 export type LogEntry = {
   /** Primary log message (extracted from the first string argument). */
   msg: string;
-  /** All original arguments passed to the log method (kept for backward compatibility). */
-  messages: unknown[];
+  /**
+   * Original arguments passed to the log method.
+   * Only present when the logger was constructed with `keepMessages: true`.
+   * Skipped by default to reduce per-entry memory footprint — use `msg` and
+   * `fields` for structured access.
+   */
+  messages?: unknown[];
   /** Structured key-value fields merged from the call arguments. */
   fields: Record<string, unknown>;
   timestamp: Date;
@@ -69,7 +74,8 @@ export type LogEntry = {
  */
 export type SerializableLogEntry = {
   msg: string;
-  messages: unknown[];
+  /** Present only when the source logger has `keepMessages: true`. */
+  messages?: unknown[];
   fields: Record<string, unknown>;
   timestamp: string;
   hrTime?: number;
@@ -233,6 +239,19 @@ export interface KonsoleOptions {
   buffer?: boolean;
   /** Offload log storage to a worker thread — Web Worker (browser) or worker_threads (Node.js) (default: false) */
   useWorker?: boolean;
+  /**
+   * Preserve the original `args` array on every `LogEntry` as `messages`.
+   * Off by default to save ~20–30 bytes per entry (and a small allocation)
+   * when the logger has a circular buffer or worker.
+   *
+   * Enable when:
+   * - You read `entry.messages` from `getLogs()` / `viewLogs()` consumers.
+   * - You want `BrowserFormatter` to surface every object argument as an
+   *   expandable DevTools value (otherwise only `entry.fields` is expanded).
+   *
+   * @default false
+   */
+  keepMessages?: boolean;
   /**
    * Transports to forward log entries to external destinations.
    * Accepts both `TransportConfig` plain objects (auto-wrapped in `HttpTransport`)

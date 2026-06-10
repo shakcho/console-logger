@@ -133,7 +133,7 @@ Every log entry forwarded to transport filters, `criteria` functions, and `getLo
 ```typescript
 type LogEntry = {
   msg: string;                      // primary message
-  messages: unknown[];              // original arguments
+  messages?: unknown[];             // original arguments — only when keepMessages: true
   fields: Record<string, unknown>;  // structured key-value pairs (includes bindings)
   timestamp: Date;
   hrTime?: number;                  // high-res nanosecond offset (when highResolution: true)

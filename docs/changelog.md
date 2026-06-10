@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.2.0]
+
+### Added
+
+- **`keepMessages` option** — opt-in storage of the original log arguments on each `LogEntry`
+  - New `KonsoleOptions.keepMessages` (default `false`). Off by default to save ~20–30 bytes per entry plus the args-array allocation in buffer mode and the per-entry `JSON.stringify` map in worker mode
+  - Children inherit the parent's setting
+  - Turn on when reading `entry.messages` from `getLogs()` / `viewLogs()` consumers, or to surface every object argument as expandable in `BrowserFormatter`
+
+### Changed
+
+- `LogEntry.messages` and `SerializableLogEntry.messages` are now optional (`unknown[] | undefined`). Previously every entry carried a copy of the args array
+- `BrowserFormatter` falls back to `entry.fields` for the expandable DevTools value when `messages` is absent — covers the common `info('msg', { fields })` and object-first calling patterns. Set `keepMessages: true` to restore expansion of every raw object argument
+
+### Migration
+
+- If you read `entry.messages` from `getLogs()` / `viewLogs()` or a custom transport, either pass `keepMessages: true` on the logger or migrate to `entry.msg` + `entry.fields`, which together capture the same information for the supported calling conventions
+
+---
+
 ## [5.1.3]
 
 ### Added

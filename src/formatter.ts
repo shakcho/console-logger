@@ -284,10 +284,20 @@ export class BrowserFormatter implements Formatter {
     const ts     = formatTimestamp(entry.timestamp, this.tsFormat, entry.hrTime);
     const fields = renderFields(entry.fields);
 
-    // Any object args passed directly (shown as expandable in DevTools)
-    const expandable = entry.messages.filter(
-      (m): m is object => typeof m === 'object' && m !== null,
-    );
+    // Any object args passed directly (shown as expandable in DevTools).
+    // When `messages` is preserved (keepMessages: true), surface every object
+    // arg. Otherwise fall back to the merged `fields` object — which covers
+    // the common `info('msg', { fields })` and object-first calling patterns.
+    let expandable: object[];
+    if (entry.messages) {
+      expandable = entry.messages.filter(
+        (m): m is object => typeof m === 'object' && m !== null,
+      );
+    } else if (entry.fields && Object.keys(entry.fields).length > 0) {
+      expandable = [entry.fields];
+    } else {
+      expandable = [];
+    }
 
     let fmt = '';
     const styles: string[] = [];
